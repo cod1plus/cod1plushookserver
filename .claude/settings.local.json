@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(gh api:*)",
+      "Bash(python3:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh repo view:*)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "Bash(node:*)",
+      "Bash(timeout:*)",
+      "Bash(ping:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:docs.cod1x.eu)",
+      "WebFetch(domain:www.thetechgame.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:cabconmodding.com)",
+      "Bash(scp:*)"
+    ]
+  }
+}
