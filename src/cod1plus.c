@@ -1,411 +1,772 @@
 /*
- * cod1plus.c
- * Stats collection for Call of Duty 1 v1.5
- * Uses BSS scan to dynamically locate svs.clients pointer
+ * cod1plus.c  —  CoD1 SoloQ S&D Stats Tracker
+ *
+ * Injected via LD_PRELOAD into cod_lnxded.
+ * At round end, PAM's sd.gsc prints a [STATS_EVENT] line to qconsole.log.
+ * This code tails that file, parses the event, merges with matchdata.cfg,
+ * and POSTs the full fpschallenge.eu-compatible payload to the local backend.
+ *
+ * Data flow:
+ *   PAM sd.gsc  →  qconsole.log  →  cod1plus.so  →  localhost:3005/api/round_end
+ *                                                          ↓
+ *                                               fpschallenge.eu (via HTTPS in Node.js)
  */
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <pthread.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <ctype.h>
-#include <signal.h>
-#include <setjmp.h>
 #include <stdint.h>
-#include <sys/types.h>
+#include <ctype.h>
+#include <time.h>
 
 #define COD1PLUS_TAG    "[cod1plus]"
-#define BACKEND_HOST    "localhost"
-#define BACKEND_PORT    3005
-#define STATS_PATH      "/api/stats"
+#define CFG_PATH        "./matchdata.cfg"
+#define MAX_PLAYERS     32
 
-/* BSS bounds for cod_lnxded (non-PIE, fixed addresses from /proc/maps) */
-#define BSS_START       0x080f7000U
-#define BSS_END         0x083e9000U
+/* ------------------------------------------------------------------ */
+/* Structures                                                           */
+/* ------------------------------------------------------------------ */
 
-/* Discovered via BSS scan: BSS[0x083CCD90] -> svs.clients */
-#define ADDR_SVS_CLIENTS_HINT   0x083CCD90U
+typedef struct {
+    char name[64];
+    char uuid[64];
+    int  team; /* 1 or 2 */
+} player_cfg_t;
 
-#define MAX_CLIENTS             64
-#define MAX_NETNAME             36
-#define CLIENT_T_SIZE           371124
-#define CLIENT_T_OFF_GENTITY    0x10A40
-#define PLAYERSTATE_SIZE        0x22cc   /* size of ONE playerState_t copy */
-#define POFF_SESSIONSTATE       (PLAYERSTATE_SIZE * 2)  /* gc has TWO ps copies; sess is at gc+0x4598 */
+typedef struct {
+    char match_id[64];
+    char start_time[64];
 
-typedef enum {
-    CS_FREE = 0,
-    CS_ZOMBIE = 1,
-    CS_CONNECTED = 2,
-    CS_PRIMED = 3,
-    CS_ACTIVE = 4
-} clientState_t;
+    char team1_id[64];
+    char team1_name[128];
+    char team1_tag[32];
+    int  team1_side;   /* 1 = team1 starts as allies, 2 = team1 starts as axis */
 
-#define CLIENT_AT(base, i)  ((uintptr_t)(base) + (uintptr_t)CLIENT_T_SIZE * (i))
+    char team2_id[64];
+    char team2_name[128];
+    char team2_tag[32];
 
-/* ---- SIGSEGV-safe memory reads ---- */
-static __thread sigjmp_buf   g_jmpbuf;
-static __thread volatile int g_in_safe = 0;
-static struct sigaction      g_old_segv;
+    char format[16];   /* "BO1", "BO3", … */
+    char mr[16];       /* "MR12", "MR10", … — display only */
+    int  half_round;   /* default 12 */
+    int  score_limit;  /* default 13 */
+    int  round_limit;  /* default 24 */
 
-static void segv_handler(int sig, siginfo_t *si, void *ctx) {
-    if (g_in_safe) { g_in_safe = 0; siglongjmp(g_jmpbuf, 1); }
-    if (g_old_segv.sa_flags & SA_SIGINFO) g_old_segv.sa_sigaction(sig, si, ctx);
-    else if (g_old_segv.sa_handler != SIG_DFL && g_old_segv.sa_handler != SIG_IGN)
-        g_old_segv.sa_handler(sig);
-    else { signal(sig, SIG_DFL); raise(sig); }
+    char api_url[256];
+    char demo_url[256];
+    char logfile[256];
+
+    player_cfg_t players[MAX_PLAYERS];
+    int          num_players;
+
+    int loaded; /* 1 once parsed successfully */
+} match_config_t;
+
+typedef struct {
+    char  name[64];
+    char  team[16];   /* "allies" or "axis" */
+    int   kills;
+    int   deaths;
+    int   assists;
+    int   damage;
+    int   grenades;
+    int   plants;
+    int   defuses;
+    float score;
+    int   headshots;
+    int   grenade_damage;
+    float adr;
+} event_player_t;
+
+typedef struct {
+    int   round;
+    int   allies_score;
+    int   axis_score;
+    char  round_winner[16]; /* "allies", "axis", "draw" */
+    int   is_halftime;
+    int   bomb_planted;
+    event_player_t players[MAX_PLAYERS];
+    int   num_players;
+} round_event_t;
+
+static match_config_t g_cfg;
+static int            g_team1_won_maps = 0;
+static int            g_team2_won_maps = 0;
+static int            g_finished_maps  = 0;
+
+/* ------------------------------------------------------------------ */
+/* Config parser — handles: set KEY "VALUE"  or  set KEY VALUE         */
+/* Lines starting with '//' are comments.                              */
+/* ------------------------------------------------------------------ */
+
+static void cfg_trim(char *s) {
+    /* Remove trailing whitespace/newline */
+    size_t n = strlen(s);
+    while (n > 0 && (s[n-1] == '\n' || s[n-1] == '\r' ||
+                     s[n-1] == ' '  || s[n-1] == '\t'))
+        s[--n] = 0;
 }
 
-static int safe_read32(uintptr_t addr, uint32_t *out) {
-    g_in_safe = 1;
-    if (sigsetjmp(g_jmpbuf, 1)) { g_in_safe = 0; return -1; }
-    *out = *(volatile uint32_t *)addr;
-    g_in_safe = 0;
-    return 0;
-}
+static int cfg_parse_line(const char *line, char *key, char *val, size_t sz) {
+    /* Skip comments and blank lines */
+    const char *p = line;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p == '/' || *p == '#' || *p == '\n' || *p == '\r' || *p == 0)
+        return 0;
 
-static int safe_readstr(uintptr_t src, char *dst, size_t sz) {
-    g_in_safe = 1;
-    if (sigsetjmp(g_jmpbuf, 1)) { g_in_safe = 0; dst[0] = 0; return -1; }
-    size_t i;
-    for (i = 0; i + 1 < sz; i++) {
-        char c = *(volatile char *)(src + i);
-        dst[i] = c;
-        if (!c) break;
+    /* Expect "set KEY VALUE" */
+    if (strncmp(p, "set ", 4) != 0) return 0;
+    p += 4;
+    while (*p == ' ') p++;
+
+    /* Read key */
+    size_t ki = 0;
+    while (*p && *p != ' ' && *p != '\t' && ki + 1 < sz)
+        key[ki++] = *p++;
+    key[ki] = 0;
+    if (ki == 0) return 0;
+
+    while (*p == ' ' || *p == '\t') p++;
+
+    /* Read value — quoted or unquoted */
+    size_t vi = 0;
+    if (*p == '"') {
+        p++;
+        while (*p && *p != '"' && vi + 1 < sz)
+            val[vi++] = *p++;
+    } else {
+        while (*p && *p != '\n' && *p != '\r' && vi + 1 < sz)
+            val[vi++] = *p++;
     }
-    dst[i] = 0;
-    g_in_safe = 0;
-    return 0;
+    val[vi] = 0;
+    cfg_trim(val);
+    return 1;
 }
-/* ----------------------------------- */
 
-/* Anonymous memory regions (> 10 MB, writable) */
-#define MAX_ANON 8
-typedef struct { uintptr_t lo, hi; } range_t;
-static range_t g_anon[MAX_ANON];
-static int     g_n_anon = 0;
+static void cfg_set(match_config_t *c, const char *key, const char *val) {
+#define SET_STR(k, field) if (strcmp(key, k) == 0) { strncpy(c->field, val, sizeof(c->field)-1); return; }
+#define SET_INT(k, field) if (strcmp(key, k) == 0) { c->field = atoi(val); return; }
 
-static void load_anon_maps(void) {
-    g_n_anon = 0;
-    FILE *f = fopen("/proc/self/maps", "r");
-    if (!f) return;
-    char line[256];
-    while (fgets(line, sizeof(line), f) && g_n_anon < MAX_ANON) {
-        unsigned long lo, hi;
-        char perms[8], dev[8];
-        unsigned long inode;
-        if (sscanf(line, "%lx-%lx %4s %*x %5s %lu", &lo, &hi, perms, dev, &inode) == 5) {
-            /* Anonymous = inode 0, not a named file */
-            (void)dev;
-            if (inode == 0 &&
-                perms[0] == 'r' && perms[1] == 'w' &&
-                (hi - lo) > 10 * 1024 * 1024) {
-                g_anon[g_n_anon].lo = (uintptr_t)lo;
-                g_anon[g_n_anon].hi = (uintptr_t)hi;
-                g_n_anon++;
-            }
+    SET_STR("cod1plus_match_id",    match_id)
+    SET_STR("cod1plus_start_time",  start_time)
+    SET_STR("cod1plus_team1_id",    team1_id)
+    SET_STR("cod1plus_team1_name",  team1_name)
+    SET_STR("cod1plus_team1_tag",   team1_tag)
+    SET_INT("cod1plus_team1_side",  team1_side)
+    SET_STR("cod1plus_team2_id",    team2_id)
+    SET_STR("cod1plus_team2_name",  team2_name)
+    SET_STR("cod1plus_team2_tag",   team2_tag)
+    SET_STR("cod1plus_format",      format)
+    SET_STR("cod1plus_mr",          mr)
+    SET_INT("cod1plus_half_round",  half_round)
+    SET_INT("cod1plus_score_limit", score_limit)
+    SET_INT("cod1plus_round_limit", round_limit)
+    SET_STR("cod1plus_api_url",     api_url)
+    SET_STR("cod1plus_demo_url",    demo_url)
+    SET_STR("cod1plus_logfile",     logfile)
+#undef SET_STR
+#undef SET_INT
+
+    /* Players: cod1plus_player1 .. cod1plus_playerN  →  "name,uuid,team" */
+    if (strncmp(key, "cod1plus_player", 15) == 0 && c->num_players < MAX_PLAYERS) {
+        player_cfg_t *p = &c->players[c->num_players];
+        char tmp[256];
+        strncpy(tmp, val, sizeof(tmp)-1);
+        char *name = strtok(tmp, ",");
+        char *uuid = strtok(NULL, ",");
+        char *team = strtok(NULL, ",");
+        if (name && uuid && team) {
+            strncpy(p->name, name, sizeof(p->name)-1);
+            strncpy(p->uuid, uuid, sizeof(p->uuid)-1);
+            p->team = atoi(team);
+            c->num_players++;
         }
     }
-    fclose(f);
 }
 
-static int in_anon(uintptr_t v) {
-    for (int i = 0; i < g_n_anon; i++)
-        if (v >= g_anon[i].lo && v < g_anon[i].hi) return 1;
+static int cfg_load(match_config_t *c, const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        printf("%s matchdata.cfg not found at '%s' — running without match config\n",
+               COD1PLUS_TAG, path);
+        return -1;
+    }
+
+    /* Defaults */
+    c->team1_side   = 1;
+    c->half_round   = 12;
+    c->score_limit  = 13;
+    c->round_limit  = 24;
+    strncpy(c->format,   "BO1",             sizeof(c->format)-1);
+    strncpy(c->mr,       "MR12",            sizeof(c->mr)-1);
+    strncpy(c->api_url,  "http://localhost:3005/api/round_end", sizeof(c->api_url)-1);
+    strncpy(c->logfile,  "./qconsole.log",  sizeof(c->logfile)-1);
+
+    char line[512];
+    char key[128], val[256];
+    while (fgets(line, sizeof(line), f)) {
+        if (cfg_parse_line(line, key, val, sizeof(key)))
+            cfg_set(c, key, val);
+    }
+    fclose(f);
+
+    /* If start_time not set, use current time */
+    if (c->start_time[0] == 0) {
+        time_t now = time(NULL);
+        struct tm *tm_info = gmtime(&now);
+        strftime(c->start_time, sizeof(c->start_time),
+                 "%Y-%m-%dT%H:%M:%S.000Z", tm_info);
+    }
+
+    c->loaded = 1;
+    printf("%s Match config loaded: match_id=%s  %s vs %s  format=%s\n",
+           COD1PLUS_TAG, c->match_id, c->team1_name, c->team2_name, c->format);
+    printf("%s %d player(s) configured\n", COD1PLUS_TAG, c->num_players);
     return 0;
 }
 
-/*
- * Scan BSS for svs.clients:
- *   - Read entire BSS via /proc/self/mem (fast, no SIGSEGV risk)
- *   - For each 4-byte word that points into a large anon region,
- *     check if dereferencing it gives a valid client state (CS_CONNECTED+)
- * Returns the BSS address that holds svs.clients, or 0.
- */
-static uintptr_t find_svs_clients(void) {
-    load_anon_maps();
-    printf("%s Scan: %d large anon region(s) found:\n", COD1PLUS_TAG, g_n_anon);
-    for (int i = 0; i < g_n_anon; i++)
-        printf("%s   [0x%08X - 0x%08X] (%u MB)\n", COD1PLUS_TAG,
-            (unsigned)g_anon[i].lo, (unsigned)g_anon[i].hi,
-            (unsigned)((g_anon[i].hi - g_anon[i].lo) >> 20));
+/* ------------------------------------------------------------------ */
+/* +match create {id} — parse match ID from /proc/self/cmdline         */
+/* ------------------------------------------------------------------ */
 
-    size_t bss_size = BSS_END - BSS_START;
-    uint8_t *buf = malloc(bss_size);
-    if (!buf) { printf("%s malloc failed\n", COD1PLUS_TAG); return 0; }
+static int parse_cmdline_match_id(char *out, size_t sz) {
+    FILE *f = fopen("/proc/self/cmdline", "r");
+    if (!f) return -1;
 
-    int memfd = open("/proc/self/mem", O_RDONLY);
-    ssize_t r = (memfd >= 0) ? pread(memfd, buf, bss_size, (off_t)BSS_START) : -1;
-    if (memfd >= 0) close(memfd);
+    char cmdline[4096] = {0};
+    size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, f);
+    fclose(f);
 
-    if (r != (ssize_t)bss_size) {
-        printf("%s Failed to read BSS (r=%zd)\n", COD1PLUS_TAG, r);
-        free(buf);
-        return 0;
+    /* cmdline is NUL-separated: arg0\0arg1\0arg2\0...
+     * Looking for: +match\0create\0{id}\0 */
+    size_t i = 0;
+    while (i < n) {
+        const char *arg = &cmdline[i];
+        size_t len = strlen(arg);
+        if (len == 0) { i++; continue; }
+
+        if (strcasecmp(arg, "+match") == 0) {
+            size_t next = i + len + 1;
+            if (next < n && strcasecmp(&cmdline[next], "create") == 0) {
+                size_t id_start = next + strlen(&cmdline[next]) + 1;
+                if (id_start < n && cmdline[id_start]) {
+                    strncpy(out, &cmdline[id_start], sz - 1);
+                    out[sz - 1] = 0;
+                    return 0;
+                }
+            }
+        }
+        i += len + 1;
     }
-
-    uintptr_t result = 0;
-    uint32_t *words = (uint32_t *)buf;
-    size_t n = bss_size / 4;
-
-    for (size_t i = 0; i < n; i++) {
-        uint32_t v = words[i];
-        if (!in_anon(v)) continue;
-        /* Reject non-16-byte-aligned pointers (hunk alloc is 16-byte aligned) */
-        if (v & 0xF) continue;
-
-        /* Try to read as client state */
-        uint32_t state0 = 0xFF;
-        if (safe_read32((uintptr_t)v, &state0) < 0) continue;
-        if (state0 < CS_CONNECTED || state0 > CS_ACTIVE) continue;
-
-        uintptr_t bss_addr = BSS_START + i * 4;
-        printf("%s CANDIDATE: BSS[0x%08X] -> 0x%08X  state[0]=%d\n",
-            COD1PLUS_TAG, (unsigned)bss_addr, v, (int)state0);
-        /* Prefer CS_ACTIVE (4) over earlier states */
-        if (!result || state0 == CS_ACTIVE) result = bss_addr;
-    }
-
-    free(buf);
-    if (!result)
-        printf("%s No candidates found (client not yet in CS_CONNECTED+ ?)\n", COD1PLUS_TAG);
-    return result;
+    return -1;
 }
 
-/* Periodic gc diagnostic scan (runs every 30s while a player is CS_ACTIVE) */
+/* ------------------------------------------------------------------ */
+/* [STATS_EVENT] line parser                                           */
+/* Format: [STATS_EVENT]r=N,as=N,xs=N,rw=X,ht=N,bp=N,ps=n:t:k:d:a:dm:g:p:df:s|… */
+/* ------------------------------------------------------------------ */
 
-static void scan_gc_data(uintptr_t gc) {
-    printf("%s === gc=0x%08X scan ===\n", COD1PLUS_TAG, (unsigned)gc);
+static int parse_event(const char *line, round_event_t *ev) {
+    const char *tag = strstr(line, "[STATS_EVENT]");
+    if (!tag) return -1;
+    const char *p = tag + strlen("[STATS_EVENT]");
 
-    /* 1. Complete dump of gc[0x1F00..0x2500]: region around netname (found at gc+0x2128)
-     *    clientPersistant_t starts somewhere here; kills/deaths should be nearby */
-    printf("%s Complete dump gc[0x1F00..0x2500] (around netname at gc+0x2128):\n", COD1PLUS_TAG);
-    for (uint32_t off = 0x1F00; off < 0x2500; off += 4) {
-        uint32_t v = 0;
-        safe_read32(gc + off, &v);
-        if (v != 0)
-            printf("%s   gc+0x%04X = %d (0x%08X)  NON-ZERO\n", COD1PLUS_TAG, off, (int)v, v);
-        else
-            printf("%s   gc+0x%04X = 0\n", COD1PLUS_TAG, off);
+    memset(ev, 0, sizeof(*ev));
+
+    /* Copy into mutable buffer */
+    char buf[4096];
+    strncpy(buf, p, sizeof(buf)-1);
+    buf[sizeof(buf)-1] = 0;
+
+    /* Separate ps= section before strtok destroys commas */
+    char ps_buf[2048] = {0};
+    char *ps_start = strstr(buf, ",ps=");
+    if (ps_start) {
+        strncpy(ps_buf, ps_start + 4, sizeof(ps_buf)-1);
+        *ps_start = 0;
     }
 
-    /* 2. Scan gc[0x1000..0x4400] for value=4 (expected deaths after 4 suicides) */
-    printf("%s Scanning gc[0x1000..0x4400] for value=4 (expected deaths):\n", COD1PLUS_TAG);
-    for (uint32_t off = 0x1000; off < 0x4400; off += 4) {
-        uint32_t v = 0;
-        if (safe_read32(gc + off, &v) < 0) continue;
-        if (v == 4)
-            printf("%s   gc+0x%04X = 4  <-- CANDIDATE DEATHS\n", COD1PLUS_TAG, off);
+    /* Parse r=,as=,xs=,rw=,ht=,bp= */
+    char *tok = strtok(buf, ",");
+    while (tok) {
+        char k[32] = {0}, v[64] = {0};
+        if (sscanf(tok, "%31[^=]=%63s", k, v) == 2) {
+            if      (strcmp(k, "r")  == 0) ev->round        = atoi(v);
+            else if (strcmp(k, "as") == 0) ev->allies_score  = atoi(v);
+            else if (strcmp(k, "xs") == 0) ev->axis_score    = atoi(v);
+            else if (strcmp(k, "rw") == 0) strncpy(ev->round_winner, v, 15);
+            else if (strcmp(k, "ht") == 0) ev->is_halftime   = atoi(v);
+            else if (strcmp(k, "bp") == 0) ev->bomb_planted  = atoi(v);
+        }
+        tok = strtok(NULL, ",");
     }
 
-    /* 3. All non-zero values in gc[0x22CC..0x4400] (after second ps copy) */
-    printf("%s All non-zero in gc[0x22CC..0x4400] (after ps copies):\n", COD1PLUS_TAG);
-    for (uint32_t off = 0x22CC; off < 0x4400; off += 4) {
-        uint32_t v = 0;
-        if (safe_read32(gc + off, &v) < 0) continue;
-        if (v != 0)
-            printf("%s   gc+0x%04X = %d (0x%08X)\n", COD1PLUS_TAG, off, (int)v, v);
+    /* Parse player list: name:team:kills:deaths:assists:damage:grenades:plants:defuses:score */
+    char *pline = strtok(ps_buf, "|");
+    while (pline && ev->num_players < MAX_PLAYERS) {
+        event_player_t *ep = &ev->players[ev->num_players];
+        char score_str[32] = {0};
+        char adr_str[32] = {0};
+        int n = sscanf(pline,
+            "%63[^:]:%15[^:]:%d:%d:%d:%d:%d:%d:%d:%31[^:]:%d:%d:%31s",
+            ep->name, ep->team,
+            &ep->kills, &ep->deaths, &ep->assists, &ep->damage,
+            &ep->grenades, &ep->plants, &ep->defuses, score_str,
+            &ep->headshots, &ep->grenade_damage, adr_str);
+        if (n >= 10) {
+            ep->score = strtof(score_str, NULL);
+            if (n == 13) ep->adr = strtof(adr_str, NULL);
+            ev->num_players++;
+        }
+        pline = strtok(NULL, "|");
     }
 
-    printf("%s === end scan ===\n", COD1PLUS_TAG);
+    return 0;
 }
 
-/* Runtime-discovered address of svs.clients in BSS */
-static uintptr_t g_addr_svs_clients = ADDR_SVS_CLIENTS_HINT;
-static int       g_scan_done = 0;
-static uint32_t  g_loop_tick = 0;    /* incremented each 5-second loop */
-static uint32_t  g_gc_scan_tick = 0; /* g_loop_tick when last gc scan ran */
+/* ------------------------------------------------------------------ */
+/* Payload builder — produces the fpschallenge.eu JSON                 */
+/* ------------------------------------------------------------------ */
 
-/* Simple HTTP POST */
-static int http_post(const char *data) {
-    struct hostent *srv = gethostbyname(BACKEND_HOST);
-    if (!srv) return -1;
+static void json_esc(const char *src, char *dst, size_t sz) {
+    size_t j = 0;
+    for (size_t i = 0; src[i] && j + 2 < sz; i++) {
+        unsigned char c = (unsigned char)src[i];
+        if (c == '"' || c == '\\') { dst[j++] = '\\'; dst[j++] = c; }
+        else if (c >= 32 && c < 127) dst[j++] = (char)c;
+    }
+    dst[j] = 0;
+}
+
+/* Return the UUID for a player by name (from match config).
+   If no config / no match → returns the name itself as fallback UUID. */
+static const char *lookup_uuid(const match_config_t *c, const char *name) {
+    for (int i = 0; i < c->num_players; i++)
+        if (strcasecmp(c->players[i].name, name) == 0)
+            return c->players[i].uuid;
+    return name; /* fallback */
+}
+
+/* Return "team1" or "team2" for a player by name from config.
+   If not found, use GSC team (allies/axis) + halftime state to infer. */
+static const char *lookup_team_label(const match_config_t *c,
+                                     const char *name,
+                                     const char *gsc_team,
+                                     int is_halftime)
+{
+    /* Prefer explicit config mapping */
+    for (int i = 0; i < c->num_players; i++) {
+        if (strcasecmp(c->players[i].name, name) == 0)
+            return c->players[i].team == 1 ? "team1" : "team2";
+    }
+
+    /* Fallback: infer from GSC side + halftime.
+     * team1_side=1 means team1 starts as allies.
+     * After halftime the sides are swapped. */
+    int team1_is_allies = (c->team1_side == 1);
+    if (is_halftime) team1_is_allies = !team1_is_allies;
+
+    int player_is_allies = (strcmp(gsc_team, "allies") == 0);
+    return (player_is_allies == team1_is_allies) ? "team1" : "team2";
+}
+
+/* Compute team1_score / team2_score from allies/axis scores + halftime. */
+static void resolve_scores(const match_config_t *c,
+                            int allies_score, int axis_score, int is_halftime,
+                            int *t1, int *t2)
+{
+    /* After PAM halftime: scores are swapped.
+     * Before halftime: allies_score belongs to whoever started as allies. */
+    int team1_is_allies = (c->team1_side == 1);
+    if (is_halftime) team1_is_allies = !team1_is_allies;
+
+    if (team1_is_allies) { *t1 = allies_score; *t2 = axis_score; }
+    else                  { *t1 = axis_score;  *t2 = allies_score; }
+}
+
+static int build_payload(const match_config_t *c,
+                         const round_event_t *ev,
+                         char *out, size_t out_sz)
+{
+    int t1_score, t2_score;
+    resolve_scores(c, ev->allies_score, ev->axis_score, ev->is_halftime,
+                   &t1_score, &t2_score);
+
+    /* Determine match state */
+    const char *state = "playing";
+    if (t1_score >= c->score_limit || t2_score >= c->score_limit ||
+        ev->round >= c->round_limit)
+        state = "finished";
+
+    /* Round display string, e.g. "Round 3 | MR12" */
+    char round_str[64];
+    snprintf(round_str, sizeof(round_str), "Round %d | %s", ev->round, c->mr);
+
+    /* Escaped strings */
+    char t1n[256], t2n[256], mapn[64], demo[512];
+    json_esc(c->team1_name,  t1n,  sizeof(t1n));
+    json_esc(c->team2_name,  t2n,  sizeof(t2n));
+    json_esc(c->demo_url,    demo, sizeof(demo));
+
+    /* Read map name from /proc/self/cmdline (+map argument) */
+    mapn[0] = 0;
+    {
+        FILE *f = fopen("/proc/self/cmdline", "r");
+        if (f) {
+            char cmdline[2048] = {0};
+            fread(cmdline, 1, sizeof(cmdline)-1, f);
+            fclose(f);
+            /* cmdline is NUL-separated; scan for "+map\0mapname" */
+            for (int i = 0; i < 2000; i++) {
+                if (cmdline[i] == 0 && strncmp(&cmdline[i+1], "+map", 4) == 0) {
+                    strncpy(mapn, &cmdline[i+6], sizeof(mapn)-1);
+                    break;
+                }
+            }
+        }
+        if (mapn[0] == 0) strncpy(mapn, "unknown", sizeof(mapn)-1);
+    }
+
+    /* Begin JSON */
+    int pos = snprintf(out, out_sz,
+        "{"
+        "\"type\":\"data\","
+        "\"start_time\":\"%s\","
+        "\"match_id\":\"%s\","
+        "\"team1_id\":\"%s\","
+        "\"team2_id\":\"%s\","
+        "\"team1_name\":\"%s\","
+        "\"team2_name\":\"%s\","
+        "\"demoUploadURL\":\"%s\","
+        "\"format\":\"%s\","
+        "\"forceNickNames\":\"true\","
+        "\"playersCount\":\"%d\","
+        "\"team1_tag\":\"%s\","
+        "\"team2_tag\":\"%s\","
+        "\"team1_winnedMaps\":\"%d\","
+        "\"team2_winnedMaps\":\"%d\","
+        "\"finishedMapsCount\":\"%d\","
+        "\"team1_score\":\"%d\","
+        "\"team2_score\":\"%d\","
+        "\"map\":\"%s\","
+        "\"round\":\"%s\","
+        "\"state\":\"%s\","
+        "\"debug\":\"sd endround\","
+        "\"players\":[",
+        c->start_time,
+        c->match_id,
+        c->team1_id, c->team2_id,
+        t1n, t2n,
+        demo,
+        c->format,
+        c->num_players > 0 ? c->num_players : ev->num_players,
+        c->team1_tag, c->team2_tag,
+        g_team1_won_maps, g_team2_won_maps, g_finished_maps,
+        t1_score, t2_score,
+        mapn, round_str, state);
+
+    /* Players array */
+    for (int i = 0; i < ev->num_players && pos < (int)out_sz - 256; i++) {
+        const event_player_t *ep = &ev->players[i];
+        const char *uuid       = lookup_uuid(c, ep->name);
+        const char *team_label = lookup_team_label(c, ep->name, ep->team,
+                                                   ev->is_halftime);
+        const char *team_name  = (strcmp(team_label, "team1") == 0)
+                                 ? c->team1_name : c->team2_name;
+
+        char esc_name[128], esc_uuid[128], esc_tname[256];
+        json_esc(ep->name,  esc_name,  sizeof(esc_name));
+        json_esc(uuid,      esc_uuid,  sizeof(esc_uuid));
+        json_esc(team_name, esc_tname, sizeof(esc_tname));
+
+        char key_uuid[128];
+        snprintf(key_uuid, sizeof(key_uuid), "UUID_%s", esc_uuid);
+
+        char score_str[32];
+        snprintf(score_str, sizeof(score_str), "%.1f", ep->score);
+
+        char adr_str2[32];
+        snprintf(adr_str2, sizeof(adr_str2), "%.2f", ep->adr);
+
+        int n = snprintf(out + pos, out_sz - pos,
+            "%s{"
+            "\"key\":\"%s\","
+            "\"uuid\":\"%s\","
+            "\"name\":\"%s\","
+            "\"team\":\"%s\","
+            "\"team_name\":\"%s\","
+            "\"score\":\"%s\","
+            "\"kills\":\"%d\","
+            "\"assists\":\"%d\","
+            "\"damage\":\"%d\","
+            "\"deaths\":\"%d\","
+            "\"headshots\":\"%d\","
+            "\"grenades\":\"%d\","
+            "\"plants\":\"%d\","
+            "\"defuses\":\"%d\","
+            "\"grenade_damage\":\"%d\","
+            "\"adr\":\"%s\""
+            "}",
+            i ? "," : "",
+            key_uuid, esc_uuid, esc_name,
+            team_label, esc_tname, score_str,
+            ep->kills, ep->assists, ep->damage, ep->deaths,
+            ep->headshots, ep->grenades, ep->plants, ep->defuses,
+            ep->grenade_damage, adr_str2);
+        pos += n;
+    }
+
+    snprintf(out + pos, out_sz - pos, "]}");
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* HTTP POST (raw socket, sends to local backend on localhost)         */
+/* ------------------------------------------------------------------ */
+
+static int http_post(const char *url, const char *json) {
+    /* Parse http://host:port/path */
+    char host[128] = "localhost";
+    int  port      = 3005;
+    char path[256] = "/api/round_end";
+
+    const char *p = url;
+    if (strncmp(p, "http://", 7) == 0) p += 7;
+    char hostport[256] = {0};
+    const char *slash = strchr(p, '/');
+    if (slash) {
+        strncpy(hostport, p, (size_t)(slash - p));
+        strncpy(path, slash, sizeof(path)-1);
+    } else {
+        strncpy(hostport, p, sizeof(hostport)-1);
+    }
+    char *colon = strchr(hostport, ':');
+    if (colon) { *colon = 0; port = atoi(colon+1); }
+    if (hostport[0]) strncpy(host, hostport, sizeof(host)-1);
+
+    struct hostent *srv = gethostbyname(host);
+    if (!srv) { printf("%s gethostbyname failed\n", COD1PLUS_TAG); return -1; }
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) return -1;
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
-    addr.sin_port   = htons(BACKEND_PORT);
-    memcpy(&addr.sin_addr.s_addr, srv->h_addr, srv->h_length);
-    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) { close(sock); return -1; }
+    addr.sin_port   = htons((uint16_t)port);
+    memcpy(&addr.sin_addr.s_addr, srv->h_addr, (size_t)srv->h_length);
 
-    char req[8192];
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(sock);
+        printf("%s HTTP connect failed\n", COD1PLUS_TAG);
+        return -1;
+    }
+
+    char req[65536];
     snprintf(req, sizeof(req),
-        "POST %s HTTP/1.1\r\nHost: %s:%d\r\n"
-        "Content-Type: application/json\r\nContent-Length: %zu\r\n"
-        "Connection: close\r\n\r\n%s",
-        STATS_PATH, BACKEND_HOST, BACKEND_PORT, strlen(data), data);
+        "POST %s HTTP/1.1\r\n"
+        "Host: %s:%d\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %zu\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+        "%s",
+        path, host, port, strlen(json), json);
+
     send(sock, req, strlen(req), 0);
     close(sock);
     return 0;
 }
 
-static void json_escape(const char *src, char *dst, size_t sz) {
-    size_t j = 0;
-    for (size_t i = 0; src[i] && j + 2 < sz; i++) {
-        unsigned char c = (unsigned char)src[i];
-        if (c == '"' || c == '\\') { dst[j++] = '\\'; dst[j++] = c; }
-        else if (c == '\n')        { dst[j++] = '\\'; dst[j++] = 'n'; }
-        else if (c >= 32 && c < 127) dst[j++] = c;
+/* ------------------------------------------------------------------ */
+/* HTTP GET to local backend (for match setup)                         */
+/* ------------------------------------------------------------------ */
+
+#define BACKEND_PORT_DEFAULT 3005
+
+static int http_get(const char *url_path, int port, char *resp, size_t resp_sz) {
+    struct hostent *srv = gethostbyname("localhost");
+    if (!srv) { printf("%s gethostbyname failed\n", COD1PLUS_TAG); return -1; }
+
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return -1;
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port   = htons((uint16_t)port);
+    memcpy(&addr.sin_addr.s_addr, srv->h_addr, (size_t)srv->h_length);
+
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(sock);
+        return -1;
     }
-    dst[j] = 0;
+
+    char req[1024];
+    snprintf(req, sizeof(req),
+        "GET %s HTTP/1.1\r\n"
+        "Host: localhost:%d\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        url_path, port);
+
+    send(sock, req, strlen(req), 0);
+
+    /* Read full response */
+    size_t total = 0;
+    ssize_t n;
+    while ((n = recv(sock, resp + total, resp_sz - total - 1, 0)) > 0)
+        total += (size_t)n;
+    resp[total] = 0;
+    close(sock);
+
+    /* Skip HTTP headers — find body after \r\n\r\n */
+    char *body = strstr(resp, "\r\n\r\n");
+    if (body) {
+        body += 4;
+        memmove(resp, body, strlen(body) + 1);
+    }
+
+    return 0;
 }
 
-static void *stats_loop(void *arg) {
+static int fetch_match_setup(const char *match_id) {
+    const char *port_env = getenv("COD1PLUS_BACKEND_PORT");
+    int port = (port_env && *port_env) ? atoi(port_env) : BACKEND_PORT_DEFAULT;
+
+    char url_path[512];
+    snprintf(url_path, sizeof(url_path), "/api/match_setup?id=%s", match_id);
+
+    printf("%s Fetching match config from backend (port %d) for match %s...\n",
+           COD1PLUS_TAG, port, match_id);
+
+    char resp[8192] = {0};
+    if (http_get(url_path, port, resp, sizeof(resp)) != 0) {
+        printf("%s Failed to connect to backend\n", COD1PLUS_TAG);
+        return -1;
+    }
+
+    if (strstr(resp, "\"ok\":true")) {
+        printf("%s Match config fetched and written to matchdata.cfg\n", COD1PLUS_TAG);
+        return 0;
+    }
+
+    printf("%s Match setup failed: %s\n", COD1PLUS_TAG, resp);
+    return -1;
+}
+
+/* ------------------------------------------------------------------ */
+/* qconsole.log tailer thread                                          */
+/* ------------------------------------------------------------------ */
+
+static void *log_tailer_thread(void *arg) {
     (void)arg;
-    printf("%s Stats thread started, waiting 30s...\n", COD1PLUS_TAG);
-    sleep(30);
-    printf("%s Starting stats collection\n", COD1PLUS_TAG);
+    printf("%s Log tailer started, waiting for matchdata.cfg...\n", COD1PLUS_TAG);
+
+    /* Wait for config to be loaded */
+    for (int i = 0; i < 60 && !g_cfg.loaded; i++) sleep(1);
+    if (!g_cfg.loaded) {
+        printf("%s No match config — log tailer idle\n", COD1PLUS_TAG);
+        /* Still tail the log, will build payload without config */
+    }
+
+    const char *logpath = g_cfg.logfile[0] ? g_cfg.logfile : "./qconsole.log";
+    printf("%s Tailing '%s' for [STATS_EVENT] lines...\n", COD1PLUS_TAG, logpath);
+
+    FILE *f = NULL;
+    long  last_pos = 0;
 
     while (1) {
-        sleep(5);
-        g_loop_tick++;
+        sleep(1);
 
-        /* Refresh anon regions every tick - they grow as maps load */
-        load_anon_maps();
-
-        /* Step 1: read svs.clients pointer */
-        uint32_t clients_raw = 0;
-        safe_read32(g_addr_svs_clients, &clients_raw);
-
-        /* Reset scan flags if pointer is null (server restart / map change) */
-        if (!clients_raw) { g_scan_done = 0; g_gc_scan_tick = 0; continue; }
-
-        /* If pointer not in known regions, try a BSS scan */
-        if (!in_anon(clients_raw) && !g_scan_done) {
-            printf("%s 0x%08X is not in any anon region - scanning BSS...\n",
-                COD1PLUS_TAG, clients_raw);
-            g_scan_done = 1;
-            uintptr_t found = find_svs_clients();
-            if (found) {
-                g_addr_svs_clients = found;
-                safe_read32(g_addr_svs_clients, &clients_raw);
-                printf("%s Using svs.clients @ BSS[0x%08X] = 0x%08X\n",
-                    COD1PLUS_TAG, (unsigned)found, clients_raw);
+        /* (Re)open the log file */
+        if (!f) {
+            f = fopen(logpath, "r");
+            if (!f) continue;
+            /* Seek to end on first open to skip historical log entries */
+            if (last_pos == 0) {
+                fseek(f, 0, SEEK_END);
+                last_pos = ftell(f);
             }
         }
 
-        if (!clients_raw || !in_anon(clients_raw)) continue;
-
-        /* Step 2: iterate client slots */
-        char json[8192];
-        int pos = snprintf(json, sizeof(json), "{\"players\":[");
-        int count = 0;
-
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-            uintptr_t slot = CLIENT_AT(clients_raw, i);
-
-            uint32_t state_v = 0;
-            if (safe_read32(slot, &state_v) < 0) continue;
-            /* Only accept valid states: CS_CONNECTED(2), CS_PRIMED(3), CS_ACTIVE(4) */
-            if (state_v < CS_CONNECTED || state_v > CS_ACTIVE) continue;
-
-            /* gentity pointer - must be in anon region to be valid */
-            uint32_t gent = 0;
-            int gent_ret = safe_read32(slot + CLIENT_T_OFF_GENTITY, &gent);
-            if (gent_ret < 0 || !gent || !in_anon((uintptr_t)gent)) continue;
-
-            /* gclient pointer at gentity+0x15C (discovered via scan) */
-            uint32_t gc = 0;
-            int gc_ret = safe_read32((uintptr_t)gent + 0x15C, &gc);
-
-            /* Debug: gc scan every ~60s while CS_ACTIVE (suicide first, then wait for output) */
-            if (i == 0 && state_v == CS_ACTIVE &&
-                (!g_gc_scan_tick || (g_loop_tick - g_gc_scan_tick) >= 6)) {
-                g_gc_scan_tick = g_loop_tick;
-                printf("%s slot[0] state=%d gent=0x%08X gc=0x%08X (tick=%u)\n",
-                    COD1PLUS_TAG, (int)state_v, gent, gc, g_loop_tick);
-                scan_gc_data((uintptr_t)gc);
-
-                /* Scan client_t (slot) for name - it's stored here, not in gclient */
-                printf("%s client_t strings (slot=0x%08X, first 0x1400 bytes):\n",
-                    COD1PLUS_TAG, (unsigned)slot);
-                for (uint32_t soff = 0; soff < 0x1400; soff++) {
-                    char sbuf[64] = {0};
-                    if (safe_readstr(slot + soff, sbuf, sizeof(sbuf)) < 0) continue;
-                    int slen = 0;
-                    for (int k = 0; sbuf[k]; k++) {
-                        unsigned char sc = (unsigned char)sbuf[k];
-                        if (sc >= 0x20 && sc < 0x7F) slen++;
-                        else break;
-                    }
-                    if (slen >= 3) {
-                        printf("%s   slot+0x%04X: '%s'\n", COD1PLUS_TAG, soff, sbuf);
-                        soff += (uint32_t)(slen > 1 ? slen - 1 : 0);
-                    }
-                }
-            }
-
-            if (gc_ret < 0 || !gc || !in_anon((uintptr_t)gc)) continue;
-
-            /* Confirmed offsets (CoD1 v1.5 gclient_t, FFA/DM):
-             *   gc+0x20DC = score/frags (net: +1 per kill, -1 per suicide)
-             *   gc+0x20E0 = deaths (total deaths including suicides) */
-            uint32_t kills = 0, deaths = 0;
-            safe_read32((uintptr_t)gc + 0x20DC, &kills);
-            safe_read32((uintptr_t)gc + 0x20E0, &deaths);
-
-            /* Read name from client_t userinfo (\name\VALUE\ at slot+0x000C) */
-            char raw[MAX_NETNAME * 2] = {0};
-            {
-                char info[512] = {0};
-                safe_readstr(slot + 0x000C, info, sizeof(info));
-                char *p = strstr(info, "\\name\\");
-                if (p) {
-                    p += 6;
-                    size_t ni = 0;
-                    while (p[ni] && p[ni] != '\\' && ni + 1 < sizeof(raw)) {
-                        raw[ni] = p[ni];
-                        ni++;
-                    }
-                    raw[ni] = 0;
-                }
-            }
-
-            char name[128] = {0};
-            json_escape(raw, name, sizeof(name));
-
-            char buf[256];
-            int n = snprintf(buf, sizeof(buf),
-                "%s{\"id\":%d,\"name\":\"%s\",\"kills\":%d,\"deaths\":%d,\"state\":%d}",
-                count ? "," : "", i, name, (int)kills, (int)deaths, (int)state_v);
-            if (pos + n < (int)sizeof(json) - 8) {
-                memcpy(json + pos, buf, n);
-                pos += n;
-            }
-            count++;
+        /* Check if file was rotated (new file smaller than last position) */
+        struct stat st;
+        if (stat(logpath, &st) == 0 && (long)st.st_size < last_pos) {
+            fclose(f);
+            f = NULL;
+            last_pos = 0;
+            continue;
         }
 
-        snprintf(json + pos, sizeof(json) - pos, "]}");
-        printf("%s %d player(s): %s\n", COD1PLUS_TAG, count, json);
-        if (count > 0) http_post(json);
+        fseek(f, last_pos, SEEK_SET);
+        char line[8192];
+        while (fgets(line, sizeof(line), f)) {
+            if (strstr(line, "[STATS_EVENT]")) {
+                printf("%s Event received: %.120s...\n", COD1PLUS_TAG, line);
+
+                round_event_t ev;
+                if (parse_event(line, &ev) == 0) {
+                    printf("%s Round %d done — %d players, winner=%s, as=%d xs=%d\n",
+                           COD1PLUS_TAG, ev.round, ev.num_players,
+                           ev.round_winner, ev.allies_score, ev.axis_score);
+
+                    char payload[65536];
+                    build_payload(&g_cfg, &ev, payload, sizeof(payload));
+                    printf("%s Sending payload (%zu bytes) to %s\n",
+                           COD1PLUS_TAG, strlen(payload), g_cfg.api_url);
+
+                    if (http_post(g_cfg.api_url, payload) == 0)
+                        printf("%s Payload sent OK\n", COD1PLUS_TAG);
+                    else
+                        printf("%s Payload send FAILED\n", COD1PLUS_TAG);
+                }
+            }
+        }
+        last_pos = ftell(f);
     }
     return NULL;
 }
 
-static void __attribute__((constructor)) init(void) {
-    printf("%s Loaded\n", COD1PLUS_TAG);
+/* ------------------------------------------------------------------ */
+/* Constructor / Destructor                                            */
+/* ------------------------------------------------------------------ */
 
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_sigaction = segv_handler;
-    sa.sa_flags = SA_SIGINFO;
-    sigemptyset(&sa.sa_mask);
-    sigaction(SIGSEGV, &sa, &g_old_segv);
+static void __attribute__((constructor)) init(void) {
+    printf("%s Loaded (v2 — S&D SoloQ)\n", COD1PLUS_TAG);
+
+    /* Check for +match create {id} in command line */
+    char match_id[64] = {0};
+    if (parse_cmdline_match_id(match_id, sizeof(match_id)) == 0) {
+        printf("%s Match ID from cmdline: %s\n", COD1PLUS_TAG, match_id);
+        int ok = 0;
+        for (int attempt = 1; attempt <= 10 && !ok; attempt++) {
+            if (fetch_match_setup(match_id) == 0) {
+                ok = 1;
+            } else {
+                printf("%s Backend not ready, retrying in 2s (%d/10)...\n",
+                       COD1PLUS_TAG, attempt);
+                sleep(2);
+            }
+        }
+        if (!ok)
+            printf("%s Could not fetch match config — falling back to local file\n",
+                   COD1PLUS_TAG);
+    }
+
+    cfg_load(&g_cfg, CFG_PATH);
 
     pthread_t tid;
-    if (pthread_create(&tid, NULL, stats_loop, NULL) == 0) {
+    if (pthread_create(&tid, NULL, log_tailer_thread, NULL) == 0) {
         pthread_detach(tid);
-        printf("%s Stats thread started\n", COD1PLUS_TAG);
+        printf("%s Log tailer thread started\n", COD1PLUS_TAG);
     }
 }
 
 static void __attribute__((destructor)) fini(void) {
-    sigaction(SIGSEGV, &g_old_segv, NULL);
     printf("%s Unloaded\n", COD1PLUS_TAG);
 }

@@ -17,7 +17,16 @@
       "WebFetch(domain:www.thetechgame.com)",
       "WebFetch(domain:gist.github.com)",
       "WebFetch(domain:cabconmodding.com)",
-      "Bash(scp:*)"
+      "Bash(scp:*)",
+      "Bash(/Users/enzo/Desktop/cod1plus/zzzzz_vcodpam_nolib_2_15/maps/mp/gametypes/sd.gsc << 'GSCEOF'\n\n\n// CoD1Plus: print round stats to qconsole.log at end of each S&D round.\n// Format: [STATS_EVENT]r=N,as=N,xs=N,rw=allies|axis|draw,ht=0|1,bp=0|1,ps=name:team:k:d:a:dm:g:p:df:score|...\n// Picked up by cod1plus.so log tailer thread.\ncod1plus_sendStats\\(\\)\n{\n\ts = \"[STATS_EVENT]\";\n\ts += \"r=\" + game[\"roundsplayed\"] + \",\";\n\ts += \"as=\" + game[\"allies_score\"] + \",\";\n\ts += \"xs=\" + game[\"axis_score\"] + \",\";\n\ts += \"rw=\" + level.roundwinner + \",\";\n\n\tht = \"0\";\n\tif \\(isDefined\\(game[\"is_halftime\"]\\) && game[\"is_halftime\"]\\)\n\t\tht = \"1\";\n\ts += \"ht=\" + ht + \",\";\n\n\tbp = \"0\";\n\tif \\(isDefined\\(game[\"bombplanted\"]\\)\\)\n\t\tbp = \"1\";\n\ts += \"bp=\" + bp + \",\";\n\n\ts += \"ps=\";\n\tfirst = true;\n\tfor \\(i = 0; i < game[\"playerstats\"].size; i++\\)\n\t{\n\t\tps = game[\"playerstats\"][i];\n\t\tif \\(!isDefined\\(ps\\)\\) continue;\n\t\tif \\(!isDefined\\(ps[\"deleted\"]\\)\\) continue;\n\t\tif \\(ps[\"deleted\"]\\) continue;\n\n\t\tif \\(!first\\) s += \"|\";\n\t\tfirst = false;\n\n\t\t// name:team:kills:deaths:assists:damage:grenades:plants:defuses:score\n\t\ts += ps[\"name\"] + \":\";\n\t\ts += ps[\"team\"] + \":\";\n\t\ts += ps[\"kills\"] + \":\";\n\t\ts += ps[\"deaths\"] + \":\";\n\t\ts += ps[\"assists\"] + \":\";\n\t\ts += ps[\"damage\"] + \":\";\n\t\ts += ps[\"grenades\"] + \":\";\n\t\ts += ps[\"plants\"] + \":\";\n\t\ts += ps[\"defuses\"] + \":\";\n\t\ts += ps[\"score\"];\n\t}\n\n\tlogPrint\\(s + \"\\\\n\"\\);\n}\nGSCEOF)",
+      "Bash(ssh:*)",
+      "Bash(zip:*)",
+      "Bash(gcc:*)",
+      "Bash(xxd:*)",
+      "WebFetch(domain:fpschallenge.eu)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)",
+      "Bash(wc:*)"
     ]
   }
 }

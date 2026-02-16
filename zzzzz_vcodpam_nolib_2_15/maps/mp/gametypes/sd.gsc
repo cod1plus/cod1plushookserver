@@ -224,6 +224,7 @@ precache()
 	precacheShader("gfx/hud/hud@bombplanted_down.tga");
 	precacheShader("gfx/hud/hud@bombplanted_down.tga");
 	precacheShader("objpoint_star");
+	precacheShader("white");
 	precacheString(&"SD_MATCHSTARTING");
 	precacheString(&"SD_MATCHRESUMING");
 	precacheString(&"SD_EXPLOSIVESPLANTED");
@@ -823,10 +824,17 @@ onPlayerKilled(eInflictor, attacker, iDamage, sMeansOfDeath, sWeapon, vDir, sHit
 				attacker maps\mp\gametypes\_player_stat::AddKill();
 				attacker maps\mp\gametypes\_player_stat::AddScore(1);
 
+				if (sHitLoc == "head")
+				{
+					attacker maps\mp\gametypes\_player_stat::AddHeadshot();
+				}
+
 				if (sMeansOfDeath == "MOD_GRENADE_SPLASH")
 				{
 					attacker maps\mp\gametypes\_player_stat::AddGrenade();
 				}
+
+				attacker thread cod1plus_killMarker();
 
 				logprint("_sd::onPlayerKilled increasing attacker " + attacker.name + " stats\n");
 			}
@@ -1867,7 +1875,7 @@ endRound(roundwinner)
 {
 	level endon("intermission");
 
-	//logprint("_sd::endRound started\n");
+	logprint("cod1plus_debug: endRound called winner=" + roundwinner + "\n");
 
 	// If this function was already called, dont do it again
 	if(level.roundended)
@@ -2020,6 +2028,9 @@ endRound(roundwinner)
 
 	// Update adr_lastUpdate and gerenade_damage_lastUpdate for each player.
 	maps\mp\gametypes\_player_stat::UpdateAdrAndGrenadeDamageWhenRoundIsOver();
+
+	// CoD1Plus: send round stats to qconsole.log (picked up by cod1plus.so)
+	cod1plus_sendStats();
 
 	// In SD there are 3 checks: Time limit, Score limit and Round limit
 
@@ -3916,4 +3927,124 @@ onSpawnedPlayer()
 		self disableWeapon();
 	}
 	// logprint("sd::onSpawnedPlayer " + self.name + " end\n");
+}
+
+// CoD1Plus: kill confirmation hitmarker - 4 red lines, visible only on kill.
+// Coords: absolute screen pixels, center = (320, 240) for 640x480
+cod1plus_killMarker()
+{
+	self endon("disconnect");
+	self endon("death");
+
+	// Top line (2x8px, center at 320,222)
+	top = maps\mp\gametypes\global\_global::newClientHudElem2(self);
+	top setShader("white", 2, 8);
+	top.x = 320;
+	top.y = 222;
+	top.alignX = "center";
+	top.alignY = "middle";
+	top.color = (1, 0, 0);
+	top.alpha = 1;
+
+	// Bottom line (2x8px, center at 320,258)
+	bot = maps\mp\gametypes\global\_global::newClientHudElem2(self);
+	bot setShader("white", 2, 8);
+	bot.x = 320;
+	bot.y = 258;
+	bot.alignX = "center";
+	bot.alignY = "middle";
+	bot.color = (1, 0, 0);
+	bot.alpha = 1;
+
+	// Left line (8x2px, center at 306,240)
+	lft = maps\mp\gametypes\global\_global::newClientHudElem2(self);
+	lft setShader("white", 8, 2);
+	lft.x = 306;
+	lft.y = 240;
+	lft.alignX = "center";
+	lft.alignY = "middle";
+	lft.color = (1, 0, 0);
+	lft.alpha = 1;
+
+	// Right line (8x2px, center at 334,240)
+	rgt = maps\mp\gametypes\global\_global::newClientHudElem2(self);
+	rgt setShader("white", 8, 2);
+	rgt.x = 334;
+	rgt.y = 240;
+	rgt.alignX = "center";
+	rgt.alignY = "middle";
+	rgt.color = (1, 0, 0);
+	rgt.alpha = 1;
+
+	wait 0.15;
+
+	top fadeOverTime(0.3);
+	bot fadeOverTime(0.3);
+	lft fadeOverTime(0.3);
+	rgt fadeOverTime(0.3);
+	top.alpha = 0;
+	bot.alpha = 0;
+	lft.alpha = 0;
+	rgt.alpha = 0;
+
+	wait 0.3;
+
+	top destroy();
+	bot destroy();
+	lft destroy();
+	rgt destroy();
+}
+
+// CoD1Plus: print round stats to qconsole.log at end of each S&D round.
+// Format: [STATS_EVENT]r=N,as=N,xs=N,rw=allies|axis|draw,ht=0|1,bp=0|1,ps=name:team:k:d:a:dm:g:p:df:score|...
+// Picked up by cod1plus.so log tailer thread.
+cod1plus_sendStats()
+{
+	logprint("cod1plus_debug: sendStats called roundsplayed=" + game["roundsplayed"] + "\n");
+
+	s = "[STATS_EVENT]";
+	s += "r=" + game["roundsplayed"] + ",";
+	s += "as=" + game["allies_score"] + ",";
+	s += "xs=" + game["axis_score"] + ",";
+	s += "rw=" + level.roundwinner + ",";
+
+	ht = "0";
+	if (isDefined(game["is_halftime"]) && game["is_halftime"])
+		ht = "1";
+	s += "ht=" + ht + ",";
+
+	bp = "0";
+	if (isDefined(level.bombplanted) && level.bombplanted)
+		bp = "1";
+	s += "bp=" + bp + ",";
+
+	s += "ps=";
+	first = true;
+	for (i = 0; i < game["playerstats"].size; i++)
+	{
+		ps = game["playerstats"][i];
+		if (!isDefined(ps)) continue;
+		if (!isDefined(ps["deleted"])) continue;
+		if (ps["deleted"]) continue;
+
+		if (!first) s += "|";
+		first = false;
+
+		// name:team:kills:deaths:assists:damage:grenades:plants:defuses:score:headshots:grenade_damage:adr
+		s += ps["name"] + ":";
+		s += ps["team"] + ":";
+		s += ps["kills"] + ":";
+		s += ps["deaths"] + ":";
+		s += ps["assists"] + ":";
+		s += ps["damage"] + ":";
+		s += ps["grenades"] + ":";
+		s += ps["plants"] + ":";
+		s += ps["defuses"] + ":";
+		s += ps["score"] + ":";
+		s += ps["headshots"] + ":";
+		s += ps["grenade_damage"] + ":";
+		s += ps["adr"];
+	}
+
+	logPrint(s + "\n");
 }

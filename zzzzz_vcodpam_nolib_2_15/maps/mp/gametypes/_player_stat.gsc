@@ -251,6 +251,7 @@ onConnected()
 			game["playerstats"][newIndex]["grenades"] = 0;
 			game["playerstats"][newIndex]["plants"] = 0;
 			game["playerstats"][newIndex]["defuses"] = 0;
+			game["playerstats"][newIndex]["headshots"] = 0;
 		}
 	}
   logprint("_player_stat::onConnected end\n");
@@ -341,6 +342,15 @@ AddKill()
     if (dataId >= 0)
     {
       game["playerstats"][dataId]["kills"] += 1;
+    }
+}
+
+AddHeadshot()
+{
+    dataId = self getStatId();
+    if (dataId >= 0)
+    {
+      game["playerstats"][dataId]["headshots"] += 1;
     }
 }
 
