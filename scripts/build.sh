@@ -9,6 +9,7 @@ mkdir -p "${BUILD_DIR}"
 CC="${CC:-gcc}"
 ${CC} -m32 -shared -fPIC -O2 -Wall -Wextra \
   "${ROOT_DIR}/src/cod1plus.c" \
+  "${ROOT_DIR}/archive/hooks.c" \
   -o "${BUILD_DIR}/cod1plus.so" \
   -pthread
 

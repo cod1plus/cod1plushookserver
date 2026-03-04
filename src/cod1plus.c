@@ -25,6 +25,9 @@
 #include <ctype.h>
 #include <time.h>
 
+#include "cod1_defs.h"
+#include "hooks.h"
+
 #define COD1PLUS_TAG    "[cod1plus]"
 #define CFG_PATH        "./matchdata.cfg"
 #define MAX_PLAYERS     32
@@ -60,6 +63,7 @@ typedef struct {
 
     char api_url[256];
     char demo_url[256];
+    char map[64];
     char logfile[256];
 
     player_cfg_t players[MAX_PLAYERS];
@@ -99,6 +103,18 @@ static match_config_t g_cfg;
 static int            g_team1_won_maps = 0;
 static int            g_team2_won_maps = 0;
 static int            g_finished_maps  = 0;
+typedef void (*SV_DirectConnect_t)(netadr_t from);
+typedef void (*SV_Frame_t)(int msec);
+static hook_t         g_sv_directconnect_hook;
+static SV_DirectConnect_t g_sv_directconnect_trampoline = NULL;
+static hook_t         g_sv_frame_hook;
+static SV_Frame_t     g_sv_frame_trampoline = NULL;
+static char           g_client_uuid[MAX_CLIENTS][64];
+static char           g_client_name[MAX_CLIENTS][64];
+static int8_t         g_client_uuid_status[MAX_CLIENTS];
+static unsigned char  g_client_uuid_mismatch_logged[MAX_CLIENTS];
+static unsigned char  g_client_userinfo_logged[MAX_CLIENTS];
+static int            http_post(const char *url, const char *json);
 
 /* ------------------------------------------------------------------ */
 /* Config parser — handles: set KEY "VALUE"  or  set KEY VALUE         */
@@ -169,6 +185,7 @@ static void cfg_set(match_config_t *c, const char *key, const char *val) {
     SET_INT("cod1plus_round_limit", round_limit)
     SET_STR("cod1plus_api_url",     api_url)
     SET_STR("cod1plus_demo_url",    demo_url)
+    SET_STR("cod1plus_map",         map)
     SET_STR("cod1plus_logfile",     logfile)
 #undef SET_STR
 #undef SET_INT
@@ -228,6 +245,183 @@ static int cfg_load(match_config_t *c, const char *path) {
     printf("%s Match config loaded: match_id=%s  %s vs %s  format=%s\n",
            COD1PLUS_TAG, c->match_id, c->team1_name, c->team2_name, c->format);
     printf("%s %d player(s) configured\n", COD1PLUS_TAG, c->num_players);
+    return 0;
+}
+
+static const char *json_skip_ws(const char *p) {
+    while (p && *p && (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t')) p++;
+    return p;
+}
+
+static const char *json_find_key(const char *json, const char *key) {
+    if (!json || !key) return NULL;
+    char needle[128];
+    snprintf(needle, sizeof(needle), "\"%s\"", key);
+    const char *p = json;
+    while ((p = strstr(p, needle)) != NULL) {
+        p += strlen(needle);
+        p = json_skip_ws(p);
+        if (*p != ':') continue;
+        p++;
+        return json_skip_ws(p);
+    }
+    return NULL;
+}
+
+static int json_read_string(const char *p, char *out, size_t out_sz) {
+    if (!p || *p != '"' || !out || out_sz == 0) return 0;
+    p++;
+    size_t i = 0;
+    while (*p && *p != '"' && i + 1 < out_sz) {
+        if (*p == '\\' && p[1]) p++;
+        out[i++] = *p++;
+    }
+    out[i] = 0;
+    return (*p == '"');
+}
+
+static int json_get_string(const char *json, const char *key, char *out, size_t out_sz) {
+    const char *p = json_find_key(json, key);
+    if (!p) return 0;
+    return json_read_string(p, out, out_sz);
+}
+
+static int json_get_int(const char *json, const char *key, int *out) {
+    const char *p = json_find_key(json, key);
+    if (!p || !out) return 0;
+    *out = atoi(p);
+    return 1;
+}
+
+static const char *json_find_array(const char *json, const char *key, const char **arr_end) {
+    const char *p = json_find_key(json, key);
+    if (!p || *p != '[') return NULL;
+    int depth = 0;
+    const char *q = p;
+    while (*q) {
+        if (*q == '[') depth++;
+        else if (*q == ']') {
+            depth--;
+            if (depth == 0) {
+                if (arr_end) *arr_end = q;
+                return p;
+            }
+        }
+        q++;
+    }
+    return NULL;
+}
+
+static int json_extract_string_range(const char *start, const char *end,
+                                     const char *key, char *out, size_t out_sz) {
+    if (!start || !end || start >= end) return 0;
+    size_t len = (size_t)(end - start);
+    char tmp[2048];
+    if (len >= sizeof(tmp)) len = sizeof(tmp) - 1;
+    memcpy(tmp, start, len);
+    tmp[len] = 0;
+    return json_get_string(tmp, key, out, out_sz);
+}
+
+static int parse_team_players(const char *json, const char *team_key, int team_id,
+                              player_cfg_t *out, int *count) {
+    const char *team_pos = strstr(json, team_key);
+    if (!team_pos) return 0;
+    const char *players_end = NULL;
+    const char *players = json_find_array(team_pos, "players", &players_end);
+    if (!players || !players_end) return 0;
+    const char *p = players;
+    while (p < players_end && *count < MAX_PLAYERS) {
+        const char *obj_start = strchr(p, '{');
+        if (!obj_start || obj_start > players_end) break;
+        const char *obj_end = strchr(obj_start, '}');
+        if (!obj_end || obj_end > players_end) break;
+        player_cfg_t *pc = &out[*count];
+        char name[64] = {0};
+        char uuid[64] = {0};
+        if (json_extract_string_range(obj_start, obj_end, "name", name, sizeof(name)) &&
+            json_extract_string_range(obj_start, obj_end, "uuid", uuid, sizeof(uuid))) {
+            strncpy(pc->name, name, sizeof(pc->name) - 1);
+            strncpy(pc->uuid, uuid, sizeof(pc->uuid) - 1);
+            pc->team = team_id;
+            (*count)++;
+        }
+        p = obj_end + 1;
+    }
+    return 1;
+}
+
+static int write_matchdata_cfg_from_json(const char *json, const char *path) {
+    if (!json || !path) return -1;
+    match_config_t c = {0};
+    int match_id = 0;
+    char team1_id[64] = {0}, team2_id[64] = {0};
+    char team1_name[128] = {0}, team2_name[128] = {0};
+    char team1_tag[32] = {0}, team2_tag[32] = {0};
+    char format[16] = {0};
+    char map[64] = {0};
+
+    json_get_int(json, "matchId", &match_id);
+    snprintf(c.match_id, sizeof(c.match_id), "%d", match_id);
+    json_get_string(json, "format", format, sizeof(format));
+    if (format[0]) strncpy(c.format, format, sizeof(c.format) - 1);
+
+    const char *maps_end = NULL;
+    const char *maps = json_find_array(json, "maps", &maps_end);
+    if (maps && maps_end) {
+        const char *p = json_skip_ws(maps + 1);
+        if (*p == '"') json_read_string(p, map, sizeof(map));
+    }
+    if (map[0]) strncpy(c.map, map, sizeof(c.map) - 1);
+
+    const char *team1_pos = strstr(json, "\"team1\"");
+    if (team1_pos) {
+        json_extract_string_range(team1_pos, team1_pos + 2048, "id", team1_id, sizeof(team1_id));
+        json_extract_string_range(team1_pos, team1_pos + 2048, "name", team1_name, sizeof(team1_name));
+        json_extract_string_range(team1_pos, team1_pos + 2048, "tag", team1_tag, sizeof(team1_tag));
+    }
+    const char *team2_pos = strstr(json, "\"team2\"");
+    if (team2_pos) {
+        json_extract_string_range(team2_pos, team2_pos + 2048, "id", team2_id, sizeof(team2_id));
+        json_extract_string_range(team2_pos, team2_pos + 2048, "name", team2_name, sizeof(team2_name));
+        json_extract_string_range(team2_pos, team2_pos + 2048, "tag", team2_tag, sizeof(team2_tag));
+    }
+    if (team1_id[0]) strncpy(c.team1_id, team1_id, sizeof(c.team1_id) - 1);
+    if (team2_id[0]) strncpy(c.team2_id, team2_id, sizeof(c.team2_id) - 1);
+    if (team1_name[0]) strncpy(c.team1_name, team1_name, sizeof(c.team1_name) - 1);
+    if (team2_name[0]) strncpy(c.team2_name, team2_name, sizeof(c.team2_name) - 1);
+    if (team1_tag[0]) strncpy(c.team1_tag, team1_tag, sizeof(c.team1_tag) - 1);
+    if (team2_tag[0]) strncpy(c.team2_tag, team2_tag, sizeof(c.team2_tag) - 1);
+
+    parse_team_players(json, "\"team1\"", 1, c.players, &c.num_players);
+    parse_team_players(json, "\"team2\"", 2, c.players, &c.num_players);
+
+    FILE *f = fopen(path, "w");
+    if (!f) return -1;
+    fprintf(f, "set cod1plus_match_id       \"%s\"\n", c.match_id);
+    time_t now = time(NULL);
+    struct tm *tm_info = gmtime(&now);
+    char start_time[64];
+    strftime(start_time, sizeof(start_time), "%Y-%m-%dT%H:%M:%S.000Z", tm_info);
+    fprintf(f, "set cod1plus_start_time     \"%s\"\n\n", start_time);
+    fprintf(f, "set cod1plus_team1_id       \"%s\"\n", c.team1_id);
+    fprintf(f, "set cod1plus_team1_name     \"%s\"\n", c.team1_name);
+    fprintf(f, "set cod1plus_team1_tag      \"%s\"\n", c.team1_tag);
+    fprintf(f, "set cod1plus_team1_side     \"1\"\n\n");
+    fprintf(f, "set cod1plus_team2_id       \"%s\"\n", c.team2_id);
+    fprintf(f, "set cod1plus_team2_name     \"%s\"\n", c.team2_name);
+    fprintf(f, "set cod1plus_team2_tag      \"%s\"\n\n", c.team2_tag);
+    fprintf(f, "set cod1plus_format         \"%s\"\n", c.format[0] ? c.format : "BO1");
+    fprintf(f, "set cod1plus_mr             \"MR12\"\n");
+    fprintf(f, "set cod1plus_half_round     \"12\"\n");
+    fprintf(f, "set cod1plus_score_limit    \"13\"\n");
+    fprintf(f, "set cod1plus_round_limit    \"24\"\n\n");
+    if (c.map[0]) fprintf(f, "set cod1plus_map            \"%s\"\n\n", c.map);
+    for (int i = 0; i < c.num_players; i++) {
+        fprintf(f, "set cod1plus_player%d        \"%s,%s,%d\"\n",
+                i + 1, c.players[i].name, c.players[i].uuid, c.players[i].team);
+    }
+    fclose(f);
     return 0;
 }
 
@@ -344,6 +538,134 @@ static void json_esc(const char *src, char *dst, size_t sz) {
     dst[j] = 0;
 }
 
+static int userinfo_get(const char *userinfo, const char *key, char *out, size_t out_sz) {
+    if (!userinfo || !key || !out || out_sz == 0) return 0;
+    size_t key_len = strlen(key);
+    const char *p = userinfo;
+    while (*p) {
+        if (*p == '\\') p++;
+        const char *k = p;
+        while (*p && *p != '\\') p++;
+        size_t klen = (size_t)(p - k);
+        if (*p == '\\') p++;
+        const char *v = p;
+        while (*p && *p != '\\') p++;
+        size_t vlen = (size_t)(p - v);
+        if (klen == key_len && strncmp(k, key, klen) == 0) {
+            size_t copy_len = vlen < out_sz - 1 ? vlen : out_sz - 1;
+            memcpy(out, v, copy_len);
+            out[copy_len] = 0;
+            return 1;
+        }
+        if (*p == '\\') p++;
+    }
+    return 0;
+}
+
+static int userinfo_get_safe(const char *userinfo, size_t max_len,
+                             const char *key, char *out, size_t out_sz) {
+    if (!userinfo || !key || !out || out_sz == 0 || max_len == 0) return 0;
+    size_t len = strnlen(userinfo, max_len);
+    if (len == max_len) return 0;
+    char tmp[1025];
+    if (len >= sizeof(tmp)) len = sizeof(tmp) - 1;
+    memcpy(tmp, userinfo, len);
+    tmp[len] = 0;
+    return userinfo_get(tmp, key, out, out_sz);
+}
+
+static const char *expected_uuid_for_name(const match_config_t *c, const char *name);
+
+static const char *uuid_url(void) {
+    const char *env = getenv("COD1PLUS_UUID_URL");
+    if (env && *env) return env;
+    return "";
+}
+
+static void send_uuid_event(int client_num, const char *name, const char *uuid) {
+    const char *url = uuid_url();
+    if (!url || !*url) return;
+    char esc_name[128];
+    char esc_uuid[128];
+    json_esc(name ? name : "", esc_name, sizeof(esc_name));
+    json_esc(uuid ? uuid : "", esc_uuid, sizeof(esc_uuid));
+    char payload[512];
+    snprintf(payload, sizeof(payload),
+             "{\"type\":\"client_uuid\",\"client_num\":%d,\"name\":\"%s\",\"uuid\":\"%s\"}",
+             client_num, esc_name, esc_uuid);
+    http_post(url, payload);
+}
+
+static void collect_client_uuids(void) {
+    serverStatic_t *svs = (serverStatic_t *)ADDR_SVS;
+    if (!svs || !svs->clients) return;
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        client_t *cl = (client_t *)((char *)svs->clients + (CLIENT_T_SIZE_V15 * i));
+        clientConnectState_t state = SVSCLIENT_STATE(cl);
+        if (state < CS_CONNECTED || state > CS_ACTIVE) {
+            g_client_uuid[i][0] = 0;
+            g_client_name[i][0] = 0;
+            g_client_uuid_status[i] = -1;
+            g_client_uuid_mismatch_logged[i] = 0;
+            g_client_userinfo_logged[i] = 0;
+            continue;
+        }
+        const char *userinfo = (const char *)((char *)cl + CLIENT_T_OFF_USERINFO);
+        char uuid[64];
+        if (!userinfo || userinfo[0] != '\\') {
+            continue;
+        }
+        if (!userinfo_get_safe(userinfo, 1024, "client_uuid", uuid, sizeof(uuid))) {
+            if (!userinfo_get_safe(userinfo, 1024, "handicap", uuid, sizeof(uuid))) {
+                continue;
+            }
+        }
+        if (uuid[0] == 0) continue;
+        if (strcmp(g_client_uuid[i], uuid) != 0) {
+            strncpy(g_client_uuid[i], uuid, sizeof(g_client_uuid[i]) - 1);
+            g_client_uuid[i][sizeof(g_client_uuid[i]) - 1] = 0;
+            char name[64];
+            if (!userinfo_get_safe(userinfo, 1024, "name", name, sizeof(name))) name[0] = 0;
+            if (name[0]) {
+                strncpy(g_client_name[i], name, sizeof(g_client_name[i]) - 1);
+                g_client_name[i][sizeof(g_client_name[i]) - 1] = 0;
+            }
+            printf("%s client_uuid slot=%d name=%s uuid=%s\n", COD1PLUS_TAG, i, name, uuid);
+            if (g_cfg.loaded && name[0]) {
+                const char *expected = expected_uuid_for_name(&g_cfg, name);
+                if (expected && expected[0]) {
+                    g_client_uuid_status[i] = (strcmp(uuid, expected) == 0) ? 1 : 0;
+                    if (g_client_uuid_status[i] == 0 && !g_client_uuid_mismatch_logged[i]) {
+                        printf("%s client_uuid mismatch name=%s expected=%s got=%s\n",
+                               COD1PLUS_TAG, name, expected, uuid);
+                        g_client_uuid_mismatch_logged[i] = 1;
+                    }
+                } else {
+                    g_client_uuid_status[i] = -1;
+                }
+            } else {
+                g_client_uuid_status[i] = -1;
+            }
+            send_uuid_event(i, name, uuid);
+            g_client_userinfo_logged[i] = 1;
+        }
+    }
+}
+
+static void SV_DirectConnect_Hook(netadr_t from) {
+    if (g_sv_directconnect_trampoline) {
+        g_sv_directconnect_trampoline(from);
+    }
+    collect_client_uuids();
+}
+
+static void SV_Frame_Hook(int msec) {
+    if (g_sv_frame_trampoline) {
+        g_sv_frame_trampoline(msec);
+    }
+    collect_client_uuids();
+}
+
 /* Return the UUID for a player by name (from match config).
    If no config / no match → returns the name itself as fallback UUID. */
 static const char *lookup_uuid(const match_config_t *c, const char *name) {
@@ -351,6 +673,24 @@ static const char *lookup_uuid(const match_config_t *c, const char *name) {
         if (strcasecmp(c->players[i].name, name) == 0)
             return c->players[i].uuid;
     return name; /* fallback */
+}
+
+static const char *expected_uuid_for_name(const match_config_t *c, const char *name) {
+    if (!c || !c->loaded || !name || !*name) return NULL;
+    for (int i = 0; i < c->num_players; i++) {
+        if (strcasecmp(c->players[i].name, name) == 0)
+            return c->players[i].uuid;
+    }
+    return NULL;
+}
+
+static int client_uuid_status_for_name(const char *name) {
+    if (!name || !*name) return -1;
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (g_client_name[i][0] && strcasecmp(g_client_name[i], name) == 0)
+            return g_client_uuid_status[i];
+    }
+    return -1;
 }
 
 /* Return "team1" or "team2" for a player by name from config.
@@ -416,13 +756,14 @@ static int build_payload(const match_config_t *c,
 
     /* Read map name from /proc/self/cmdline (+map argument) */
     mapn[0] = 0;
-    {
+    if (c->map[0]) {
+        strncpy(mapn, c->map, sizeof(mapn) - 1);
+    } else {
         FILE *f = fopen("/proc/self/cmdline", "r");
         if (f) {
             char cmdline[2048] = {0};
             fread(cmdline, 1, sizeof(cmdline)-1, f);
             fclose(f);
-            /* cmdline is NUL-separated; scan for "+map\0mapname" */
             for (int i = 0; i < 2000; i++) {
                 if (cmdline[i] == 0 && strncmp(&cmdline[i+1], "+map", 4) == 0) {
                     strncpy(mapn, &cmdline[i+6], sizeof(mapn)-1);
@@ -434,6 +775,15 @@ static int build_payload(const match_config_t *c,
     }
 
     /* Begin JSON */
+    int players_count = 0;
+    for (int i = 0; i < ev->num_players; i++) {
+        const event_player_t *ep = &ev->players[i];
+        const char *expected = expected_uuid_for_name(c, ep->name);
+        int status = expected ? client_uuid_status_for_name(ep->name) : -1;
+        if (expected && status == 0) continue;
+        players_count++;
+    }
+
     int pos = snprintf(out, out_sz,
         "{"
         "\"type\":\"data\","
@@ -465,7 +815,7 @@ static int build_payload(const match_config_t *c,
         t1n, t2n,
         demo,
         c->format,
-        c->num_players > 0 ? c->num_players : ev->num_players,
+        players_count,
         c->team1_tag, c->team2_tag,
         g_team1_won_maps, g_team2_won_maps, g_finished_maps,
         t1_score, t2_score,
@@ -474,6 +824,9 @@ static int build_payload(const match_config_t *c,
     /* Players array */
     for (int i = 0; i < ev->num_players && pos < (int)out_sz - 256; i++) {
         const event_player_t *ep = &ev->players[i];
+        const char *expected   = expected_uuid_for_name(c, ep->name);
+        int status             = expected ? client_uuid_status_for_name(ep->name) : -1;
+        if (expected && status == 0) continue;
         const char *uuid       = lookup_uuid(c, ep->name);
         const char *team_label = lookup_team_label(c, ep->name, ep->team,
                                                    ev->is_halftime);
@@ -583,14 +936,42 @@ static int http_post(const char *url, const char *json) {
     return 0;
 }
 
-/* ------------------------------------------------------------------ */
-/* HTTP GET to local backend (for match setup)                         */
-/* ------------------------------------------------------------------ */
+static int http_get_url(const char *url, char *resp, size_t resp_sz) {
+    if (!url || !resp || resp_sz == 0) return -1;
+    if (strncmp(url, "https://", 8) == 0) {
+        char cmd[1024];
+        snprintf(cmd, sizeof(cmd), "curl -fsL \"%s\"", url);
+        FILE *fp = popen(cmd, "r");
+        if (!fp) return -1;
+        size_t total = 0;
+        int ch;
+        while ((ch = fgetc(fp)) != EOF && total + 1 < resp_sz) {
+            resp[total++] = (char)ch;
+        }
+        resp[total] = 0;
+        int rc = pclose(fp);
+        return (rc == 0) ? 0 : -1;
+    }
 
-#define BACKEND_PORT_DEFAULT 3005
+    char host[128] = "localhost";
+    int  port      = 80;
+    char path[512] = "/";
 
-static int http_get(const char *url_path, int port, char *resp, size_t resp_sz) {
-    struct hostent *srv = gethostbyname("localhost");
+    const char *p = url;
+    if (strncmp(p, "http://", 7) == 0) p += 7;
+    char hostport[256] = {0};
+    const char *slash = strchr(p, '/');
+    if (slash) {
+        strncpy(hostport, p, (size_t)(slash - p));
+        strncpy(path, slash, sizeof(path)-1);
+    } else {
+        strncpy(hostport, p, sizeof(hostport)-1);
+    }
+    char *colon = strchr(hostport, ':');
+    if (colon) { *colon = 0; port = atoi(colon+1); }
+    if (hostport[0]) strncpy(host, hostport, sizeof(host)-1);
+
+    struct hostent *srv = gethostbyname(host);
     if (!srv) { printf("%s gethostbyname failed\n", COD1PLUS_TAG); return -1; }
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -609,14 +990,13 @@ static int http_get(const char *url_path, int port, char *resp, size_t resp_sz) 
     char req[1024];
     snprintf(req, sizeof(req),
         "GET %s HTTP/1.1\r\n"
-        "Host: localhost:%d\r\n"
+        "Host: %s:%d\r\n"
         "Connection: close\r\n"
         "\r\n",
-        url_path, port);
+        path, host, port);
 
     send(sock, req, strlen(req), 0);
 
-    /* Read full response */
     size_t total = 0;
     ssize_t n;
     while ((n = recv(sock, resp + total, resp_sz - total - 1, 0)) > 0)
@@ -624,33 +1004,33 @@ static int http_get(const char *url_path, int port, char *resp, size_t resp_sz) 
     resp[total] = 0;
     close(sock);
 
-    /* Skip HTTP headers — find body after \r\n\r\n */
     char *body = strstr(resp, "\r\n\r\n");
     if (body) {
         body += 4;
         memmove(resp, body, strlen(body) + 1);
     }
-
     return 0;
 }
 
 static int fetch_match_setup(const char *match_id) {
-    const char *port_env = getenv("COD1PLUS_BACKEND_PORT");
-    int port = (port_env && *port_env) ? atoi(port_env) : BACKEND_PORT_DEFAULT;
+    const char *api_base = getenv("COD1PLUS_API_BASE");
+    const char *game = getenv("COD1PLUS_GAME");
+    if (!api_base || !*api_base) api_base = "https://fpschallenge.eu/api/v2";
+    if (!game || !*game) game = "cod1";
 
-    char url_path[512];
-    snprintf(url_path, sizeof(url_path), "/api/match_setup?id=%s", match_id);
+    char url[512];
+    snprintf(url, sizeof(url), "%s/%s/match/%s", api_base, game, match_id);
 
-    printf("%s Fetching match config from backend (port %d) for match %s...\n",
-           COD1PLUS_TAG, port, match_id);
+    printf("%s Fetching match config from FPSChallenge for match %s...\n",
+           COD1PLUS_TAG, match_id);
 
-    char resp[8192] = {0};
-    if (http_get(url_path, port, resp, sizeof(resp)) != 0) {
-        printf("%s Failed to connect to backend\n", COD1PLUS_TAG);
+    char resp[16384] = {0};
+    if (http_get_url(url, resp, sizeof(resp)) != 0) {
+        printf("%s Failed to fetch match config\n", COD1PLUS_TAG);
         return -1;
     }
 
-    if (strstr(resp, "\"ok\":true")) {
+    if (write_matchdata_cfg_from_json(resp, CFG_PATH) == 0) {
         printf("%s Match config fetched and written to matchdata.cfg\n", COD1PLUS_TAG);
         return 0;
     }
@@ -739,26 +1119,53 @@ static void *log_tailer_thread(void *arg) {
 static void __attribute__((constructor)) init(void) {
     printf("%s Loaded (v2 — S&D SoloQ)\n", COD1PLUS_TAG);
 
-    /* Check for +match create {id} in command line */
-    char match_id[64] = {0};
-    if (parse_cmdline_match_id(match_id, sizeof(match_id)) == 0) {
-        printf("%s Match ID from cmdline: %s\n", COD1PLUS_TAG, match_id);
-        int ok = 0;
-        for (int attempt = 1; attempt <= 10 && !ok; attempt++) {
-            if (fetch_match_setup(match_id) == 0) {
-                ok = 1;
-            } else {
-                printf("%s Backend not ready, retrying in 2s (%d/10)...\n",
-                       COD1PLUS_TAG, attempt);
-                sleep(2);
+    const char *mode = getenv("COD1PLUS_MODE");
+    int live_mode = (!mode || strcasecmp(mode, "live") == 0);
+    if (mode && strcasecmp(mode, "dev") == 0) live_mode = 0;
+
+    if (live_mode) {
+        char match_id[64] = {0};
+        if (parse_cmdline_match_id(match_id, sizeof(match_id)) == 0) {
+            printf("%s Match ID from cmdline: %s\n", COD1PLUS_TAG, match_id);
+            int ok = 0;
+            for (int attempt = 1; attempt <= 10 && !ok; attempt++) {
+                if (fetch_match_setup(match_id) == 0) {
+                    ok = 1;
+                } else {
+                    printf("%s Backend not ready, retrying in 2s (%d/10)...\n",
+                           COD1PLUS_TAG, attempt);
+                    sleep(2);
+                }
             }
+            if (!ok)
+                printf("%s Could not fetch match config — falling back to local file\n",
+                       COD1PLUS_TAG);
+        } else {
+            printf("%s No match id found — using local matchdata.cfg\n", COD1PLUS_TAG);
         }
-        if (!ok)
-            printf("%s Could not fetch match config — falling back to local file\n",
-                   COD1PLUS_TAG);
+    } else {
+        printf("%s Mode dev — using local matchdata.cfg only\n", COD1PLUS_TAG);
     }
 
     cfg_load(&g_cfg, CFG_PATH);
+
+    if (hook_install(&g_sv_directconnect_hook, (uintptr_t)ADDR_SV_DIRECTCONNECT,
+                     (uintptr_t)SV_DirectConnect_Hook, 5) == 0) {
+        g_sv_directconnect_trampoline = (SV_DirectConnect_t)g_sv_directconnect_hook.trampoline;
+        printf("%s SV_DirectConnect hook installed\n", COD1PLUS_TAG);
+    } else {
+        printf("%s SV_DirectConnect hook failed\n", COD1PLUS_TAG);
+    }
+    const char *enable_frame = getenv("COD1PLUS_ENABLE_SV_FRAME");
+    if (enable_frame && *enable_frame) {
+        if (hook_install(&g_sv_frame_hook, (uintptr_t)ADDR_SV_FRAME,
+                         (uintptr_t)SV_Frame_Hook, 5) == 0) {
+            g_sv_frame_trampoline = (SV_Frame_t)g_sv_frame_hook.trampoline;
+            printf("%s SV_Frame hook installed\n", COD1PLUS_TAG);
+        } else {
+            printf("%s SV_Frame hook failed\n", COD1PLUS_TAG);
+        }
+    }
 
     pthread_t tid;
     if (pthread_create(&tid, NULL, log_tailer_thread, NULL) == 0) {
@@ -768,5 +1175,8 @@ static void __attribute__((constructor)) init(void) {
 }
 
 static void __attribute__((destructor)) fini(void) {
+    hook_remove(&g_sv_directconnect_hook);
+    if (g_sv_frame_hook.active)
+        hook_remove(&g_sv_frame_hook);
     printf("%s Unloaded\n", COD1PLUS_TAG);
 }

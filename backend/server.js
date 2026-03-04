@@ -100,8 +100,10 @@ function buildMatchdataCfg(data, backendPort) {
   lines.push(`set cod1plus_score_limit    "13"`);
   lines.push(`set cod1plus_round_limit    "24"`);
   lines.push(``);
+  const mapName = Array.isArray(data.maps) && data.maps.length ? data.maps[0] : "";
   lines.push(`set cod1plus_api_url        "http://localhost:${backendPort}/api/round_end"`);
-  lines.push(`set cod1plus_demo_url       "${data.demoUploadURL || ""}"`);
+  lines.push(`set cod1plus_demo_url       ""`);
+  if (mapName) lines.push(`set cod1plus_map            "${mapName}"`);
   lines.push(``);
   lines.push(`// Players`);
 
@@ -134,6 +136,21 @@ app.get("/api/match_setup", async (req, res) => {
     await fs.writeFile(MATCHDATA_PATH, cfg);
     console.log(`[backend] matchdata.cfg written to ${MATCHDATA_PATH}`);
 
+    res.json({ ok: true, match_id: data.matchId });
+  } catch (err) {
+    console.error("[backend] /api/match_setup error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/match_setup", async (req, res) => {
+  try {
+    const data = req.body || {};
+    if (!data.matchId || !data.team1 || !data.team2)
+      return res.status(400).json({ ok: false, error: "Missing match data" });
+    const cfg = buildMatchdataCfg(data, port);
+    await fs.writeFile(MATCHDATA_PATH, cfg);
+    console.log(`[backend] matchdata.cfg written to ${MATCHDATA_PATH}`);
     res.json({ ok: true, match_id: data.matchId });
   } catch (err) {
     console.error("[backend] /api/match_setup error:", err.message);
