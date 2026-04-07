@@ -692,12 +692,6 @@ static void collect_client_uuids(void) {
         if (!userinfo || userinfo[0] != '\\') {
             continue;
         }
-        if (!g_client_userinfo_logged[i]) {
-            char ui_safe[256];
-            strncpy(ui_safe, userinfo, sizeof(ui_safe) - 1);
-            ui_safe[sizeof(ui_safe) - 1] = 0;
-            printf("%s userinfo slot=%d: %.200s\n", COD1PLUS_TAG, i, ui_safe);
-        }
         if (!userinfo_get_safe(userinfo, 1024, "match_login", uuid, sizeof(uuid))) {
             if (!userinfo_get_safe(userinfo, 1024, "login", uuid, sizeof(uuid))) {
                 continue;
