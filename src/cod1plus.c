@@ -104,11 +104,8 @@ static int            g_team1_won_maps = 0;
 static int            g_team2_won_maps = 0;
 static int            g_finished_maps  = 0;
 typedef void (*SV_DirectConnect_t)(netadr_t from);
-typedef void (*SV_Frame_t)(int msec);
 static hook_t         g_sv_directconnect_hook;
 static SV_DirectConnect_t g_sv_directconnect_trampoline = NULL;
-static hook_t         g_sv_frame_hook;
-static SV_Frame_t     g_sv_frame_trampoline = NULL;
 static char           g_client_uuid[MAX_CLIENTS][64];
 static char           g_client_name[MAX_CLIENTS][64];
 static int8_t         g_client_uuid_status[MAX_CLIENTS];
@@ -120,7 +117,6 @@ static int            g_last_event_round = -1;
 static int            g_last_event_ht = -1;
 static int            g_current_score_limit = 13;
 static int            g_sv_maxclients = MAX_CLIENTS;
-static time_t         g_last_uuid_collect = 0;
 static int            http_post(const char *url, const char *json);
 
 /* ------------------------------------------------------------------ */
@@ -739,15 +735,13 @@ static void SV_DirectConnect_Hook(netadr_t from) {
     }
 }
 
-static void SV_Frame_Hook(int msec) {
-    if (g_sv_frame_trampoline) {
-        g_sv_frame_trampoline(msec);
-    }
-    time_t now = time(NULL);
-    if (now - g_last_uuid_collect >= 1) {
-        g_last_uuid_collect = now;
+static void *uuid_collector_thread(void *arg) {
+    (void)arg;
+    while (1) {
+        sleep(1);
         collect_client_uuids();
     }
+    return NULL;
 }
 
 /* Return the UUID for a player by name (from match config).
@@ -1298,24 +1292,20 @@ static void __attribute__((constructor)) init(void) {
     } else {
         printf("%s SV_DirectConnect hook failed\n", COD1PLUS_TAG);
     }
-    if (hook_install(&g_sv_frame_hook, (uintptr_t)ADDR_SV_FRAME,
-                     (uintptr_t)SV_Frame_Hook, 5) == 0) {
-        g_sv_frame_trampoline = (SV_Frame_t)g_sv_frame_hook.trampoline;
-        printf("%s SV_Frame hook installed\n", COD1PLUS_TAG);
-    } else {
-        printf("%s SV_Frame hook failed\n", COD1PLUS_TAG);
-    }
-
     pthread_t tid;
     if (pthread_create(&tid, NULL, log_tailer_thread, NULL) == 0) {
         pthread_detach(tid);
         printf("%s Log tailer thread started\n", COD1PLUS_TAG);
     }
+
+    pthread_t uuid_tid;
+    if (pthread_create(&uuid_tid, NULL, uuid_collector_thread, NULL) == 0) {
+        pthread_detach(uuid_tid);
+        printf("%s UUID collector thread started\n", COD1PLUS_TAG);
+    }
 }
 
 static void __attribute__((destructor)) fini(void) {
     hook_remove(&g_sv_directconnect_hook);
-    if (g_sv_frame_hook.active)
-        hook_remove(&g_sv_frame_hook);
     printf("%s Unloaded\n", COD1PLUS_TAG);
 }
