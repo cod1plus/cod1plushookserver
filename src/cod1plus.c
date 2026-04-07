@@ -119,6 +119,8 @@ static int            g_team1_is_allies_current = 1;
 static int            g_last_event_round = -1;
 static int            g_last_event_ht = -1;
 static int            g_current_score_limit = 13;
+static int            g_sv_maxclients = MAX_CLIENTS;
+static time_t         g_last_uuid_collect = 0;
 static int            http_post(const char *url, const char *json);
 
 /* ------------------------------------------------------------------ */
@@ -514,6 +516,32 @@ static int parse_cmdline_match_id(char *out, size_t sz) {
     return -1;
 }
 
+static int parse_cmdline_maxclients(void) {
+    FILE *f = fopen("/proc/self/cmdline", "r");
+    if (!f) return MAX_CLIENTS;
+
+    char cmdline[4096] = {0};
+    size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, f);
+    fclose(f);
+
+    size_t i = 0;
+    while (i < n) {
+        const char *arg = &cmdline[i];
+        size_t len = strlen(arg);
+        if (len == 0) { i++; continue; }
+
+        if (strcasecmp(arg, "sv_maxclients") == 0) {
+            size_t val_start = i + len + 1;
+            if (val_start < n && cmdline[val_start]) {
+                int v = atoi(&cmdline[val_start]);
+                if (v > 0 && v <= MAX_CLIENTS) return v;
+            }
+        }
+        i += len + 1;
+    }
+    return MAX_CLIENTS;
+}
+
 /* ------------------------------------------------------------------ */
 /* [STATS_EVENT] line parser                                           */
 /* Format: [STATS_EVENT]r=N,as=N,xs=N,rw=X,ht=N,bp=N,ps=n:t:k:d:a:dm:g:p:df:s|… */
@@ -652,7 +680,7 @@ static void send_uuid_event(int client_num, const char *name, const char *uuid) 
 static void collect_client_uuids(void) {
     serverStatic_t *svs = (serverStatic_t *)ADDR_SVS;
     if (!svs || !svs->clients) return;
-    for (int i = 0; i < MAX_CLIENTS; i++) {
+    for (int i = 0; i < g_sv_maxclients; i++) {
         client_t *cl = (client_t *)((char *)svs->clients + (CLIENT_T_SIZE_V15 * i));
         clientConnectState_t state = SVSCLIENT_STATE(cl);
         if (state < CS_CONNECTED || state > CS_ACTIVE) {
@@ -668,8 +696,8 @@ static void collect_client_uuids(void) {
         if (!userinfo || userinfo[0] != '\\') {
             continue;
         }
-        if (!userinfo_get_safe(userinfo, 1024, "client_uuid", uuid, sizeof(uuid))) {
-            if (!userinfo_get_safe(userinfo, 1024, "handicap", uuid, sizeof(uuid))) {
+        if (!userinfo_get_safe(userinfo, 1024, "match_login", uuid, sizeof(uuid))) {
+            if (!userinfo_get_safe(userinfo, 1024, "login", uuid, sizeof(uuid))) {
                 continue;
             }
         }
@@ -709,14 +737,17 @@ static void SV_DirectConnect_Hook(netadr_t from) {
     if (g_sv_directconnect_trampoline) {
         g_sv_directconnect_trampoline(from);
     }
-    collect_client_uuids();
 }
 
 static void SV_Frame_Hook(int msec) {
     if (g_sv_frame_trampoline) {
         g_sv_frame_trampoline(msec);
     }
-    collect_client_uuids();
+    time_t now = time(NULL);
+    if (now - g_last_uuid_collect >= 1) {
+        g_last_uuid_collect = now;
+        collect_client_uuids();
+    }
 }
 
 /* Return the UUID for a player by name (from match config).
@@ -1254,6 +1285,9 @@ static void __attribute__((constructor)) init(void) {
         printf("%s Mode dev — using local matchdata.cfg only\n", COD1PLUS_TAG);
     }
 
+    g_sv_maxclients = parse_cmdline_maxclients();
+    printf("%s sv_maxclients=%d\n", COD1PLUS_TAG, g_sv_maxclients);
+
     cfg_load(&g_cfg, CFG_PATH);
     side_tracker_reset(&g_cfg);
 
@@ -1264,15 +1298,12 @@ static void __attribute__((constructor)) init(void) {
     } else {
         printf("%s SV_DirectConnect hook failed\n", COD1PLUS_TAG);
     }
-    const char *enable_frame = getenv("COD1PLUS_ENABLE_SV_FRAME");
-    if (enable_frame && *enable_frame) {
-        if (hook_install(&g_sv_frame_hook, (uintptr_t)ADDR_SV_FRAME,
-                         (uintptr_t)SV_Frame_Hook, 5) == 0) {
-            g_sv_frame_trampoline = (SV_Frame_t)g_sv_frame_hook.trampoline;
-            printf("%s SV_Frame hook installed\n", COD1PLUS_TAG);
-        } else {
-            printf("%s SV_Frame hook failed\n", COD1PLUS_TAG);
-        }
+    if (hook_install(&g_sv_frame_hook, (uintptr_t)ADDR_SV_FRAME,
+                     (uintptr_t)SV_Frame_Hook, 5) == 0) {
+        g_sv_frame_trampoline = (SV_Frame_t)g_sv_frame_hook.trampoline;
+        printf("%s SV_Frame hook installed\n", COD1PLUS_TAG);
+    } else {
+        printf("%s SV_Frame hook failed\n", COD1PLUS_TAG);
     }
 
     pthread_t tid;
