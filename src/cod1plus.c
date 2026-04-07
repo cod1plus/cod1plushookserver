@@ -7,9 +7,9 @@
  * and POSTs the full fpschallenge.eu-compatible payload to the local backend.
  *
  * Data flow:
- *   PAM sd.gsc  →  qconsole.log  →  cod1plus.so  →  localhost:3005/api/round_end
- *                                                          ↓
- *                                               fpschallenge.eu (via HTTPS in Node.js)
+ *   PAM sd.gsc  →  qconsole.log  →  cod1plus.so  →  fpschallenge.eu 
+ *                                                         
+ *                                            
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -114,6 +114,11 @@ static char           g_client_name[MAX_CLIENTS][64];
 static int8_t         g_client_uuid_status[MAX_CLIENTS];
 static unsigned char  g_client_uuid_mismatch_logged[MAX_CLIENTS];
 static unsigned char  g_client_userinfo_logged[MAX_CLIENTS];
+static int            g_side_tracker_initialized = 0;
+static int            g_team1_is_allies_current = 1;
+static int            g_last_event_round = -1;
+static int            g_last_event_ht = -1;
+static int            g_current_score_limit = 13;
 static int            http_post(const char *url, const char *json);
 
 /* ------------------------------------------------------------------ */
@@ -222,7 +227,7 @@ static int cfg_load(match_config_t *c, const char *path) {
     c->round_limit  = 24;
     strncpy(c->format,   "BO1",             sizeof(c->format)-1);
     strncpy(c->mr,       "MR12",            sizeof(c->mr)-1);
-    strncpy(c->api_url,  "http://localhost:3005/api/round_end", sizeof(c->api_url)-1);
+    strncpy(c->api_url,  "https://fpschallenge.eu/api/v2/cod1/match/", sizeof(c->api_url)-1);
     strncpy(c->logfile,  "./qconsole.log",  sizeof(c->logfile)-1);
 
     char line[512];
@@ -323,6 +328,26 @@ static int json_extract_string_range(const char *start, const char *end,
     return json_get_string(tmp, key, out, out_sz);
 }
 
+static int json_extract_int_range(const char *start, const char *end,
+                                  const char *key, int *out) {
+    if (!start || !end || start >= end) return 0;
+    size_t len = (size_t)(end - start);
+    char tmp[2048];
+    if (len >= sizeof(tmp)) len = sizeof(tmp) - 1;
+    memcpy(tmp, start, len);
+    tmp[len] = 0;
+    return json_get_int(tmp, key, out);
+}
+
+static int parse_side_value(const char *v) {
+    if (!v || !*v) return 0;
+    if (strcasecmp(v, "allies") == 0) return 1;
+    if (strcasecmp(v, "axis") == 0) return 2;
+    if (strcmp(v, "1") == 0) return 1;
+    if (strcmp(v, "2") == 0) return 2;
+    return 0;
+}
+
 static int parse_team_players(const char *json, const char *team_key, int team_id,
                               player_cfg_t *out, int *count) {
     const char *team_pos = strstr(json, team_key);
@@ -358,8 +383,12 @@ static int write_matchdata_cfg_from_json(const char *json, const char *path) {
     char team1_id[64] = {0}, team2_id[64] = {0};
     char team1_name[128] = {0}, team2_name[128] = {0};
     char team1_tag[32] = {0}, team2_tag[32] = {0};
+    char team1_side_s[32] = {0}, team2_side_s[32] = {0};
     char format[16] = {0};
     char map[64] = {0};
+    int team1_side_i = 0, team2_side_i = 0;
+
+    c.team1_side = 1;
 
     json_get_int(json, "matchId", &match_id);
     snprintf(c.match_id, sizeof(c.match_id), "%d", match_id);
@@ -379,12 +408,24 @@ static int write_matchdata_cfg_from_json(const char *json, const char *path) {
         json_extract_string_range(team1_pos, team1_pos + 2048, "id", team1_id, sizeof(team1_id));
         json_extract_string_range(team1_pos, team1_pos + 2048, "name", team1_name, sizeof(team1_name));
         json_extract_string_range(team1_pos, team1_pos + 2048, "tag", team1_tag, sizeof(team1_tag));
+        json_extract_string_range(team1_pos, team1_pos + 2048, "side", team1_side_s, sizeof(team1_side_s));
+        if (!team1_side_s[0])
+            json_extract_string_range(team1_pos, team1_pos + 2048, "startingSide", team1_side_s, sizeof(team1_side_s));
+        json_extract_int_range(team1_pos, team1_pos + 2048, "side", &team1_side_i);
+        if (team1_side_i == 0)
+            json_extract_int_range(team1_pos, team1_pos + 2048, "startingSide", &team1_side_i);
     }
     const char *team2_pos = strstr(json, "\"team2\"");
     if (team2_pos) {
         json_extract_string_range(team2_pos, team2_pos + 2048, "id", team2_id, sizeof(team2_id));
         json_extract_string_range(team2_pos, team2_pos + 2048, "name", team2_name, sizeof(team2_name));
         json_extract_string_range(team2_pos, team2_pos + 2048, "tag", team2_tag, sizeof(team2_tag));
+        json_extract_string_range(team2_pos, team2_pos + 2048, "side", team2_side_s, sizeof(team2_side_s));
+        if (!team2_side_s[0])
+            json_extract_string_range(team2_pos, team2_pos + 2048, "startingSide", team2_side_s, sizeof(team2_side_s));
+        json_extract_int_range(team2_pos, team2_pos + 2048, "side", &team2_side_i);
+        if (team2_side_i == 0)
+            json_extract_int_range(team2_pos, team2_pos + 2048, "startingSide", &team2_side_i);
     }
     if (team1_id[0]) strncpy(c.team1_id, team1_id, sizeof(c.team1_id) - 1);
     if (team2_id[0]) strncpy(c.team2_id, team2_id, sizeof(c.team2_id) - 1);
@@ -392,6 +433,17 @@ static int write_matchdata_cfg_from_json(const char *json, const char *path) {
     if (team2_name[0]) strncpy(c.team2_name, team2_name, sizeof(c.team2_name) - 1);
     if (team1_tag[0]) strncpy(c.team1_tag, team1_tag, sizeof(c.team1_tag) - 1);
     if (team2_tag[0]) strncpy(c.team2_tag, team2_tag, sizeof(c.team2_tag) - 1);
+
+    int parsed_team1_side = parse_side_value(team1_side_s);
+    int parsed_team2_side = parse_side_value(team2_side_s);
+    if (!parsed_team1_side && (team1_side_i == 1 || team1_side_i == 2))
+        parsed_team1_side = team1_side_i;
+    if (!parsed_team2_side && (team2_side_i == 1 || team2_side_i == 2))
+        parsed_team2_side = team2_side_i;
+    if (parsed_team1_side)
+        c.team1_side = parsed_team1_side;
+    else if (parsed_team2_side)
+        c.team1_side = (parsed_team2_side == 1) ? 2 : 1;
 
     parse_team_players(json, "\"team1\"", 1, c.players, &c.num_players);
     parse_team_players(json, "\"team2\"", 2, c.players, &c.num_players);
@@ -407,7 +459,7 @@ static int write_matchdata_cfg_from_json(const char *json, const char *path) {
     fprintf(f, "set cod1plus_team1_id       \"%s\"\n", c.team1_id);
     fprintf(f, "set cod1plus_team1_name     \"%s\"\n", c.team1_name);
     fprintf(f, "set cod1plus_team1_tag      \"%s\"\n", c.team1_tag);
-    fprintf(f, "set cod1plus_team1_side     \"1\"\n\n");
+    fprintf(f, "set cod1plus_team1_side     \"%d\"\n\n", c.team1_side);
     fprintf(f, "set cod1plus_team2_id       \"%s\"\n", c.team2_id);
     fprintf(f, "set cod1plus_team2_name     \"%s\"\n", c.team2_name);
     fprintf(f, "set cod1plus_team2_tag      \"%s\"\n\n", c.team2_tag);
@@ -416,6 +468,7 @@ static int write_matchdata_cfg_from_json(const char *json, const char *path) {
     fprintf(f, "set cod1plus_half_round     \"12\"\n");
     fprintf(f, "set cod1plus_score_limit    \"13\"\n");
     fprintf(f, "set cod1plus_round_limit    \"24\"\n\n");
+    fprintf(f, "set cod1plus_api_url        \"https://fpschallenge.eu/api/v2/cod1/match/%s\"\n", c.match_id);
     if (c.map[0]) fprintf(f, "set cod1plus_map            \"%s\"\n\n", c.map);
     for (int i = 0; i < c.num_players; i++) {
         fprintf(f, "set cod1plus_player%d        \"%s,%s,%d\"\n",
@@ -525,7 +578,7 @@ static int parse_event(const char *line, round_event_t *ev) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Payload builder — produces the fpschallenge.eu JSON                 */
+/* Payload builder                */
 /* ------------------------------------------------------------------ */
 
 static void json_esc(const char *src, char *dst, size_t sz) {
@@ -698,7 +751,7 @@ static int client_uuid_status_for_name(const char *name) {
 static const char *lookup_team_label(const match_config_t *c,
                                      const char *name,
                                      const char *gsc_team,
-                                     int is_halftime)
+                                     int team1_is_allies)
 {
     /* Prefer explicit config mapping */
     for (int i = 0; i < c->num_players; i++) {
@@ -709,38 +762,76 @@ static const char *lookup_team_label(const match_config_t *c,
     /* Fallback: infer from GSC side + halftime.
      * team1_side=1 means team1 starts as allies.
      * After halftime the sides are swapped. */
-    int team1_is_allies = (c->team1_side == 1);
-    if (is_halftime) team1_is_allies = !team1_is_allies;
-
     int player_is_allies = (strcmp(gsc_team, "allies") == 0);
     return (player_is_allies == team1_is_allies) ? "team1" : "team2";
 }
 
 /* Compute team1_score / team2_score from allies/axis scores + halftime. */
 static void resolve_scores(const match_config_t *c,
-                            int allies_score, int axis_score, int is_halftime,
+                            int allies_score, int axis_score, int team1_is_allies,
                             int *t1, int *t2)
 {
-    /* After PAM halftime: scores are swapped.
-     * Before halftime: allies_score belongs to whoever started as allies. */
-    int team1_is_allies = (c->team1_side == 1);
-    if (is_halftime) team1_is_allies = !team1_is_allies;
+    (void)c;
 
     if (team1_is_allies) { *t1 = allies_score; *t2 = axis_score; }
     else                  { *t1 = axis_score;  *t2 = allies_score; }
+}
+
+static void side_tracker_reset(const match_config_t *c) {
+    int configured_team1_side = (c && c->team1_side == 2) ? 2 : 1;
+    g_team1_is_allies_current = (configured_team1_side == 1);
+    g_current_score_limit = (c && c->score_limit > 0) ? c->score_limit : 13;
+    g_last_event_round = -1;
+    g_last_event_ht = -1;
+    g_side_tracker_initialized = 1;
+}
+
+static void side_tracker_update(const match_config_t *c, const round_event_t *ev) {
+    if (!g_side_tracker_initialized) side_tracker_reset(c);
+    if (!ev) return;
+
+    int round_reset = (g_last_event_round > 0 && ev->round > 0 && ev->round < g_last_event_round);
+    if (round_reset && g_last_event_ht == 1 && ev->is_halftime == 0) {
+        int max_score = (ev->allies_score > ev->axis_score) ? ev->allies_score : ev->axis_score;
+        int ot_score_limit = max_score + 4;
+        if (ot_score_limit > g_current_score_limit)
+            g_current_score_limit = ot_score_limit;
+        printf("%s Overtime detected: dynamic score_limit=%d\n", COD1PLUS_TAG, g_current_score_limit);
+    }
+
+    if (g_last_event_ht != -1 && ev->is_halftime != g_last_event_ht) {
+        if (g_last_event_ht == 0 && ev->is_halftime == 1) {
+            g_team1_is_allies_current = !g_team1_is_allies_current;
+            printf("%s Side swap detected: team1_is_allies=%d\n", COD1PLUS_TAG, g_team1_is_allies_current);
+        } else if (g_last_event_ht == 1 && ev->is_halftime == 0 && !round_reset) {
+            g_team1_is_allies_current = !g_team1_is_allies_current;
+            printf("%s Side swap detected (ht reset): team1_is_allies=%d\n", COD1PLUS_TAG, g_team1_is_allies_current);
+        }
+    }
+
+    g_last_event_round = ev->round;
+    g_last_event_ht = ev->is_halftime;
 }
 
 static int build_payload(const match_config_t *c,
                          const round_event_t *ev,
                          char *out, size_t out_sz)
 {
+    int team1_is_allies = g_side_tracker_initialized
+                        ? g_team1_is_allies_current
+                        : ((c->team1_side == 2) ? 0 : 1);
+
     int t1_score, t2_score;
-    resolve_scores(c, ev->allies_score, ev->axis_score, ev->is_halftime,
+    resolve_scores(c, ev->allies_score, ev->axis_score, team1_is_allies,
                    &t1_score, &t2_score);
 
     /* Determine match state */
     const char *state = "playing";
-    if (t1_score >= c->score_limit || t2_score >= c->score_limit ||
+    int effective_score_limit = g_side_tracker_initialized
+                              ? g_current_score_limit
+                              : c->score_limit;
+    if (effective_score_limit <= 0) effective_score_limit = 13;
+    if (t1_score >= effective_score_limit || t2_score >= effective_score_limit ||
         ev->round >= c->round_limit)
         state = "finished";
 
@@ -822,6 +913,7 @@ static int build_payload(const match_config_t *c,
         mapn, round_str, state);
 
     /* Players array */
+    int emitted_players = 0;
     for (int i = 0; i < ev->num_players && pos < (int)out_sz - 256; i++) {
         const event_player_t *ep = &ev->players[i];
         const char *expected   = expected_uuid_for_name(c, ep->name);
@@ -829,7 +921,7 @@ static int build_payload(const match_config_t *c,
         if (expected && status == 0) continue;
         const char *uuid       = lookup_uuid(c, ep->name);
         const char *team_label = lookup_team_label(c, ep->name, ep->team,
-                                                   ev->is_halftime);
+                                                   team1_is_allies);
         const char *team_name  = (strcmp(team_label, "team1") == 0)
                                  ? c->team1_name : c->team2_name;
 
@@ -844,8 +936,8 @@ static int build_payload(const match_config_t *c,
         char score_str[32];
         snprintf(score_str, sizeof(score_str), "%.1f", ep->score);
 
-        char adr_str2[32];
-        snprintf(adr_str2, sizeof(adr_str2), "%.2f", ep->adr);
+        char damage_str[32];
+        snprintf(damage_str, sizeof(damage_str), "%.1f", (float)ep->damage);
 
         int n = snprintf(out + pos, out_sz - pos,
             "%s{"
@@ -856,23 +948,21 @@ static int build_payload(const match_config_t *c,
             "\"team_name\":\"%s\","
             "\"score\":\"%s\","
             "\"kills\":\"%d\","
-            "\"assists\":\"%d\","
-            "\"damage\":\"%d\","
-            "\"deaths\":\"%d\","
             "\"headshots\":\"%d\","
+            "\"assists\":\"%d\","
+            "\"damage\":\"%s\","
+            "\"deaths\":\"%d\","
             "\"grenades\":\"%d\","
             "\"plants\":\"%d\","
-            "\"defuses\":\"%d\","
-            "\"grenade_damage\":\"%d\","
-            "\"adr\":\"%s\""
+            "\"defuses\":\"%d\""
             "}",
-            i ? "," : "",
+            emitted_players ? "," : "",
             key_uuid, esc_uuid, esc_name,
             team_label, esc_tname, score_str,
-            ep->kills, ep->assists, ep->damage, ep->deaths,
-            ep->headshots, ep->grenades, ep->plants, ep->defuses,
-            ep->grenade_damage, adr_str2);
+            ep->kills, ep->headshots, ep->assists, damage_str, ep->deaths,
+            ep->grenades, ep->plants, ep->defuses);
         pos += n;
+        emitted_players++;
     }
 
     snprintf(out + pos, out_sz - pos, "]}");
@@ -883,7 +973,23 @@ static int build_payload(const match_config_t *c,
 /* HTTP POST (raw socket, sends to local backend on localhost)         */
 /* ------------------------------------------------------------------ */
 
+static int http_post_https(const char *url, const char *json) {
+    if (!url || !json) return -1;
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd),
+             "curl -fsS -X POST -H \"Content-Type: application/json\" --data-binary @- \"%s\" > /dev/null",
+             url);
+    FILE *fp = popen(cmd, "w");
+    if (!fp) return -1;
+    fwrite(json, 1, strlen(json), fp);
+    int rc = pclose(fp);
+    return (rc == 0) ? 0 : -1;
+}
+
 static int http_post(const char *url, const char *json) {
+    if (url && strncmp(url, "https://", 8) == 0)
+        return http_post_https(url, json);
+
     /* Parse http://host:port/path */
     char host[128] = "localhost";
     int  port      = 3005;
@@ -1091,6 +1197,7 @@ static void *log_tailer_thread(void *arg) {
 
                 round_event_t ev;
                 if (parse_event(line, &ev) == 0) {
+                    side_tracker_update(&g_cfg, &ev);
                     printf("%s Round %d done — %d players, winner=%s, as=%d xs=%d\n",
                            COD1PLUS_TAG, ev.round, ev.num_players,
                            ev.round_winner, ev.allies_score, ev.axis_score);
@@ -1148,6 +1255,7 @@ static void __attribute__((constructor)) init(void) {
     }
 
     cfg_load(&g_cfg, CFG_PATH);
+    side_tracker_reset(&g_cfg);
 
     if (hook_install(&g_sv_directconnect_hook, (uintptr_t)ADDR_SV_DIRECTCONNECT,
                      (uintptr_t)SV_DirectConnect_Hook, 5) == 0) {
