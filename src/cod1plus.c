@@ -118,6 +118,7 @@ static int            g_last_event_ht = -1;
 static int            g_current_score_limit = 13;
 static int            g_sv_maxclients = MAX_CLIENTS;
 static int            http_post(const char *url, const char *json);
+static void           parse_cmdline_fs_homepath(char *out, size_t sz);
 
 /* ------------------------------------------------------------------ */
 /* Config parser — handles: set KEY "VALUE"  or  set KEY VALUE         */
