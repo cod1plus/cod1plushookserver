@@ -229,10 +229,16 @@ static int cfg_load(match_config_t *c, const char *path) {
     strncpy(c->api_url,  "https://fpschallenge.eu/api/v2/cod1/match/", sizeof(c->api_url)-1);
     char fs_homepath[256] = {0};
     parse_cmdline_fs_homepath(fs_homepath, sizeof(fs_homepath));
-    if (fs_homepath[0])
+    if (fs_homepath[0]) {
         snprintf(c->logfile, sizeof(c->logfile), "%s/main/games_mp.log", fs_homepath);
-    else
-        strncpy(c->logfile, "./games_mp.log", sizeof(c->logfile)-1);
+    } else {
+        /* CoD1 defaults to $HOME/.callofduty when fs_homepath not set on cmdline */
+        const char *home = getenv("HOME");
+        if (home && home[0])
+            snprintf(c->logfile, sizeof(c->logfile), "%s/.callofduty/main/games_mp.log", home);
+        else
+            strncpy(c->logfile, "./games_mp.log", sizeof(c->logfile)-1);
+    }
 
     char line[512];
     char key[128], val[256];
