@@ -692,6 +692,9 @@ static void collect_client_uuids(void) {
         if (!userinfo || userinfo[0] != '\\') {
             continue;
         }
+        if (!g_client_userinfo_logged[i]) {
+            printf("%s userinfo slot=%d: %.1000s\n", COD1PLUS_TAG, i, userinfo);
+        }
         if (!userinfo_get_safe(userinfo, 1024, "match_login", uuid, sizeof(uuid))) {
             if (!userinfo_get_safe(userinfo, 1024, "login", uuid, sizeof(uuid))) {
                 continue;
