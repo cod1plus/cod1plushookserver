@@ -226,7 +226,12 @@ static int cfg_load(match_config_t *c, const char *path) {
     strncpy(c->format,   "BO1",             sizeof(c->format)-1);
     strncpy(c->mr,       "MR12",            sizeof(c->mr)-1);
     strncpy(c->api_url,  "https://fpschallenge.eu/api/v2/cod1/match/", sizeof(c->api_url)-1);
-    strncpy(c->logfile,  "./qconsole.log",  sizeof(c->logfile)-1);
+    char fs_homepath[256] = {0};
+    parse_cmdline_fs_homepath(fs_homepath, sizeof(fs_homepath));
+    if (fs_homepath[0])
+        snprintf(c->logfile, sizeof(c->logfile), "%s/main/games_mp.log", fs_homepath);
+    else
+        strncpy(c->logfile, "./games_mp.log", sizeof(c->logfile)-1);
 
     char line[512];
     char key[128], val[256];
@@ -510,6 +515,29 @@ static int parse_cmdline_match_id(char *out, size_t sz) {
         i += len + 1;
     }
     return -1;
+}
+
+static void parse_cmdline_fs_homepath(char *out, size_t sz) {
+    FILE *f = fopen("/proc/self/cmdline", "r");
+    if (!f) return;
+    char cmdline[4096] = {0};
+    size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, f);
+    fclose(f);
+    size_t i = 0;
+    while (i < n) {
+        const char *arg = &cmdline[i];
+        size_t len = strlen(arg);
+        if (len == 0) { i++; continue; }
+        if (strcasecmp(arg, "fs_homepath") == 0) {
+            size_t val = i + len + 1;
+            if (val < n && cmdline[val]) {
+                strncpy(out, &cmdline[val], sz - 1);
+                out[sz - 1] = 0;
+                return;
+            }
+        }
+        i += len + 1;
+    }
 }
 
 static int parse_cmdline_maxclients(void) {
