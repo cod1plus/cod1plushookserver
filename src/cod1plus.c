@@ -415,7 +415,11 @@ static int write_matchdata_cfg_from_json(const char *json, const char *path) {
 
     const char *team1_pos = strstr(json, "\"team1\"");
     if (team1_pos) {
-        json_extract_string_range(team1_pos, team1_pos + 2048, "id", team1_id, sizeof(team1_id));
+        if (!json_extract_string_range(team1_pos, team1_pos + 2048, "id", team1_id, sizeof(team1_id))) {
+            int id_i = 0;
+            if (json_extract_int_range(team1_pos, team1_pos + 2048, "id", &id_i))
+                snprintf(team1_id, sizeof(team1_id), "%d", id_i);
+        }
         json_extract_string_range(team1_pos, team1_pos + 2048, "name", team1_name, sizeof(team1_name));
         json_extract_string_range(team1_pos, team1_pos + 2048, "tag", team1_tag, sizeof(team1_tag));
         json_extract_string_range(team1_pos, team1_pos + 2048, "side", team1_side_s, sizeof(team1_side_s));
@@ -427,7 +431,11 @@ static int write_matchdata_cfg_from_json(const char *json, const char *path) {
     }
     const char *team2_pos = strstr(json, "\"team2\"");
     if (team2_pos) {
-        json_extract_string_range(team2_pos, team2_pos + 2048, "id", team2_id, sizeof(team2_id));
+        if (!json_extract_string_range(team2_pos, team2_pos + 2048, "id", team2_id, sizeof(team2_id))) {
+            int id_i = 0;
+            if (json_extract_int_range(team2_pos, team2_pos + 2048, "id", &id_i))
+                snprintf(team2_id, sizeof(team2_id), "%d", id_i);
+        }
         json_extract_string_range(team2_pos, team2_pos + 2048, "name", team2_name, sizeof(team2_name));
         json_extract_string_range(team2_pos, team2_pos + 2048, "tag", team2_tag, sizeof(team2_tag));
         json_extract_string_range(team2_pos, team2_pos + 2048, "side", team2_side_s, sizeof(team2_side_s));
@@ -781,6 +789,13 @@ static void *uuid_collector_thread(void *arg) {
 /* Return the UUID for a player by name (from match config).
    If no config / no match → returns the name itself as fallback UUID. */
 static const char *lookup_uuid(const match_config_t *c, const char *name) {
+    /* First: live-captured login UUID by in-game name */
+    for (int i = 0; i < g_sv_maxclients; i++) {
+        if (g_client_name[i][0] && g_client_uuid[i][0] &&
+            strcasecmp(g_client_name[i], name) == 0)
+            return g_client_uuid[i];
+    }
+    /* Second: match config by FPSChallenge username */
     for (int i = 0; i < c->num_players; i++)
         if (strcasecmp(c->players[i].name, name) == 0)
             return c->players[i].uuid;
