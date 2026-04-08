@@ -104,11 +104,8 @@ static int            g_team1_won_maps = 0;
 static int            g_team2_won_maps = 0;
 static int            g_finished_maps  = 0;
 typedef void (*SV_DirectConnect_t)(netadr_t from);
-typedef void (*SV_SetUserinfo_t)(int clientNum, const char *userinfo);
 static hook_t             g_sv_directconnect_hook;
 static SV_DirectConnect_t g_sv_directconnect_trampoline = NULL;
-static hook_t             g_sv_setuserinfo_hook;
-static SV_SetUserinfo_t   g_sv_setuserinfo_trampoline = NULL;
 static char           g_client_uuid[MAX_CLIENTS][64];
 static char           g_client_name[MAX_CLIENTS][64];
 static int8_t         g_client_uuid_status[MAX_CLIENTS];
@@ -695,7 +692,7 @@ static void collect_client_uuids(void) {
         if (!userinfo || userinfo[0] != '\\') {
             continue;
         }
-        if (!userinfo_get_safe(userinfo, 1024, "cl_guid", uuid, sizeof(uuid))) {
+        if (!userinfo_get_safe(userinfo, 1024, "login", uuid, sizeof(uuid))) {
             continue;
         }
         if (uuid[0] == 0) continue;
@@ -736,31 +733,6 @@ static void SV_DirectConnect_Hook(netadr_t from) {
     }
 }
 
-static void SV_SetUserinfo_Hook(int clientNum, const char *userinfo) {
-    if (g_sv_setuserinfo_trampoline)
-        g_sv_setuserinfo_trampoline(clientNum, userinfo);
-
-    if (clientNum < 0 || clientNum >= g_sv_maxclients) return;
-    if (!userinfo || userinfo[0] != '\\') return;
-
-    char login[64] = {0};
-    if (!userinfo_get(userinfo, "login", login, sizeof(login)) || login[0] == 0) return;
-
-    if (strcmp(g_client_uuid[clientNum], login) == 0) return;
-
-    strncpy(g_client_uuid[clientNum], login, sizeof(g_client_uuid[clientNum]) - 1);
-    g_client_uuid[clientNum][sizeof(g_client_uuid[clientNum]) - 1] = 0;
-
-    char name[64] = {0};
-    userinfo_get(userinfo, "name", name, sizeof(name));
-    if (name[0]) {
-        strncpy(g_client_name[clientNum], name, sizeof(g_client_name[clientNum]) - 1);
-        g_client_name[clientNum][sizeof(g_client_name[clientNum]) - 1] = 0;
-    }
-
-    printf("%s login slot=%d name=%s uuid=%s\n", COD1PLUS_TAG, clientNum, name, login);
-    send_uuid_event(clientNum, name, login);
-}
 
 static void *uuid_collector_thread(void *arg) {
     (void)arg;
@@ -1319,24 +1291,20 @@ static void __attribute__((constructor)) init(void) {
     } else {
         printf("%s SV_DirectConnect hook failed\n", COD1PLUS_TAG);
     }
-    if (hook_install(&g_sv_setuserinfo_hook, (uintptr_t)ADDR_SETUSERINFO,
-                     (uintptr_t)SV_SetUserinfo_Hook, 5) == 0) {
-        g_sv_setuserinfo_trampoline = (SV_SetUserinfo_t)g_sv_setuserinfo_hook.trampoline;
-        printf("%s SV_SetUserinfo hook installed\n", COD1PLUS_TAG);
-    } else {
-        printf("%s SV_SetUserinfo hook failed\n", COD1PLUS_TAG);
-    }
     pthread_t tid;
     if (pthread_create(&tid, NULL, log_tailer_thread, NULL) == 0) {
         pthread_detach(tid);
         printf("%s Log tailer thread started\n", COD1PLUS_TAG);
     }
 
+    pthread_t uuid_tid;
+    if (pthread_create(&uuid_tid, NULL, uuid_collector_thread, NULL) == 0) {
+        pthread_detach(uuid_tid);
+        printf("%s UUID collector thread started\n", COD1PLUS_TAG);
+    }
 }
 
 static void __attribute__((destructor)) fini(void) {
     hook_remove(&g_sv_directconnect_hook);
-    if (g_sv_setuserinfo_hook.active)
-        hook_remove(&g_sv_setuserinfo_hook);
     printf("%s Unloaded\n", COD1PLUS_TAG);
 }
