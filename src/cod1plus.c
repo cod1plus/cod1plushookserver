@@ -1280,6 +1280,7 @@ static void *log_tailer_thread(void *arg) {
                     build_payload(&g_cfg, &ev, payload, sizeof(payload));
                     printf("%s Sending payload (%zu bytes) to %s\n",
                            COD1PLUS_TAG, strlen(payload), g_cfg.api_url);
+                    printf("%s Payload: %s\n", COD1PLUS_TAG, payload);
 
                     if (http_post(g_cfg.api_url, payload) == 0)
                         printf("%s Payload sent OK\n", COD1PLUS_TAG);
