@@ -26,7 +26,10 @@
       "WebFetch(domain:fpschallenge.eu)",
       "Bash(kill:*)",
       "Bash(pkill:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(unzip -l /Users/enzo/Desktop/cod1plus/build/zzzzz_vcodpam_nolib_2_15.pk3)",
+      "Bash(grep -c '^{$' build/mp_coastal.map)",
+      "Bash(echo \"OK — $\\(wc -l < build/mp_coastal.map\\) lignes / $\\(wc -c < build/mp_coastal.map\\) octets / $\\(grep -c '^{$' build/mp_coastal.map\\) brushes+entités\")"
     ]
   }
 }

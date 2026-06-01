@@ -8,8 +8,7 @@
  *
  * Data flow:
  *   PAM sd.gsc  →  qconsole.log  →  cod1plus.so  →  fpschallenge.eu 
- *                                                         
- *                                            
+ *                                                                                                    
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -865,12 +864,14 @@ static void side_tracker_update(const match_config_t *c, const round_event_t *ev
     if (!ev) return;
 
     int round_reset = (g_last_event_round > 0 && ev->round > 0 && ev->round < g_last_event_round);
-    if (round_reset && g_last_event_ht == 1 && ev->is_halftime == 0) {
-        int max_score = (ev->allies_score > ev->axis_score) ? ev->allies_score : ev->axis_score;
-        int ot_score_limit = max_score + 4;
-        if (ot_score_limit > g_current_score_limit)
+    /* OT detection: PAM resets round counter to 1 with tied scores (never resets the score counters) */
+    if (round_reset && ev->allies_score > 0 && ev->allies_score == ev->axis_score) {
+        int ot_score_limit = ev->allies_score + 4;
+        if (ot_score_limit > g_current_score_limit) {
             g_current_score_limit = ot_score_limit;
-        printf("%s Overtime detected: dynamic score_limit=%d\n", COD1PLUS_TAG, g_current_score_limit);
+            printf("%s Overtime detected (score=%d-%d): score_limit now %d\n",
+                   COD1PLUS_TAG, ev->allies_score, ev->axis_score, g_current_score_limit);
+        }
     }
 
     if (g_last_event_ht != -1 && ev->is_halftime != g_last_event_ht) {

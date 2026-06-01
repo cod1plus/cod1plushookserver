@@ -1,0 +1,1769 @@
+// mp_coastal - CoD1
+// Traced from Battalion 1944 Coastal (overhead + screenshots)
+// Retexture in Radiant — textures are mp_carentan/* placeholders
+
+{
+"classname" "worldspawn"
+"ambient" "50"
+"sundirection" "70 30 0"
+"sunlight" "100"
+"suncolor" "1 0.92 0.75"
+
+{
+( -512 -512 -128 ) ( -512 3712 -128 ) ( 2912 3712 -128 ) textures/common/caulk 0 0 0 1 1
+( 2912 3712 0 ) ( -512 3712 0 ) ( -512 -512 0 ) textures/common/caulk 0 0 0 1 1
+( -512 -512 -128 ) ( 2912 -512 -128 ) ( 2912 -512 0 ) textures/common/caulk 0 0 0 1 1
+( 2912 3712 -128 ) ( -512 3712 -128 ) ( -512 3712 0 ) textures/common/caulk 0 0 0 1 1
+( -512 3712 -128 ) ( -512 -512 -128 ) ( -512 -512 0 ) textures/common/caulk 0 0 0 1 1
+( 2912 -512 -128 ) ( 2912 3712 -128 ) ( 2912 3712 0 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( -512 -512 256 ) ( -512 3712 256 ) ( 2912 3712 256 ) textures/sky/overcast 0 0 0 1 1
+( 2912 3712 384 ) ( -512 3712 384 ) ( -512 -512 384 ) textures/sky/overcast 0 0 0 1 1
+( -512 -512 256 ) ( 2912 -512 256 ) ( 2912 -512 384 ) textures/sky/overcast 0 0 0 1 1
+( 2912 3712 256 ) ( -512 3712 256 ) ( -512 3712 384 ) textures/sky/overcast 0 0 0 1 1
+( -512 3712 256 ) ( -512 -512 256 ) ( -512 -512 384 ) textures/sky/overcast 0 0 0 1 1
+( 2912 -512 256 ) ( 2912 3712 256 ) ( 2912 3712 384 ) textures/sky/overcast 0 0 0 1 1
+}
+
+{
+( -512 -512 0 ) ( -512 3712 0 ) ( 0 3712 0 ) textures/common/caulk 0 0 0 1 1
+( 0 3712 256 ) ( -512 3712 256 ) ( -512 -512 256 ) textures/common/caulk 0 0 0 1 1
+( -512 -512 0 ) ( 0 -512 0 ) ( 0 -512 256 ) textures/common/caulk 0 0 0 1 1
+( 0 3712 0 ) ( -512 3712 0 ) ( -512 3712 256 ) textures/common/caulk 0 0 0 1 1
+( -512 3712 0 ) ( -512 -512 0 ) ( -512 -512 256 ) textures/common/caulk 0 0 0 1 1
+( 0 -512 0 ) ( 0 3712 0 ) ( 0 3712 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 2400 -512 0 ) ( 2400 3712 0 ) ( 2912 3712 0 ) textures/common/caulk 0 0 0 1 1
+( 2912 3712 256 ) ( 2400 3712 256 ) ( 2400 -512 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 -512 0 ) ( 2912 -512 0 ) ( 2912 -512 256 ) textures/common/caulk 0 0 0 1 1
+( 2912 3712 0 ) ( 2400 3712 0 ) ( 2400 3712 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 3712 0 ) ( 2400 -512 0 ) ( 2400 -512 256 ) textures/common/caulk 0 0 0 1 1
+( 2912 -512 0 ) ( 2912 3712 0 ) ( 2912 3712 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( -512 -512 0 ) ( -512 0 0 ) ( 2912 0 0 ) textures/common/caulk 0 0 0 1 1
+( 2912 0 256 ) ( -512 0 256 ) ( -512 -512 256 ) textures/common/caulk 0 0 0 1 1
+( -512 -512 0 ) ( 2912 -512 0 ) ( 2912 -512 256 ) textures/common/caulk 0 0 0 1 1
+( 2912 0 0 ) ( -512 0 0 ) ( -512 0 256 ) textures/common/caulk 0 0 0 1 1
+( -512 0 0 ) ( -512 -512 0 ) ( -512 -512 256 ) textures/common/caulk 0 0 0 1 1
+( 2912 -512 0 ) ( 2912 0 0 ) ( 2912 0 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( -512 3200 0 ) ( -512 3712 0 ) ( 2912 3712 0 ) textures/common/caulk 0 0 0 1 1
+( 2912 3712 256 ) ( -512 3712 256 ) ( -512 3200 256 ) textures/common/caulk 0 0 0 1 1
+( -512 3200 0 ) ( 2912 3200 0 ) ( 2912 3200 256 ) textures/common/caulk 0 0 0 1 1
+( 2912 3712 0 ) ( -512 3712 0 ) ( -512 3712 256 ) textures/common/caulk 0 0 0 1 1
+( -512 3712 0 ) ( -512 3200 0 ) ( -512 3200 256 ) textures/common/caulk 0 0 0 1 1
+( 2912 3200 0 ) ( 2912 3712 0 ) ( 2912 3712 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 0 0 -16 ) ( 0 3200 -16 ) ( 2400 3200 -16 ) textures/mp_carentan/ext_street 0 0 0 1 1
+( 2400 3200 0 ) ( 0 3200 0 ) ( 0 0 0 ) textures/common/caulk 0 0 0 1 1
+( 0 0 -16 ) ( 2400 0 -16 ) ( 2400 0 0 ) textures/mp_carentan/ext_street 0 0 0 1 1
+( 2400 3200 -16 ) ( 0 3200 -16 ) ( 0 3200 0 ) textures/mp_carentan/ext_street 0 0 0 1 1
+( 0 3200 -16 ) ( 0 0 -16 ) ( 0 0 0 ) textures/mp_carentan/ext_street 0 0 0 1 1
+( 2400 0 -16 ) ( 2400 3200 -16 ) ( 2400 3200 0 ) textures/mp_carentan/ext_street 0 0 0 1 1
+}
+
+{
+( 2080 760 0 ) ( 2080 2460 0 ) ( 2400 2460 0 ) textures/common/caulk 0 0 0 1 1
+( 2400 2460 256 ) ( 2080 2460 256 ) ( 2080 760 256 ) textures/common/caulk 0 0 0 1 1
+( 2080 760 0 ) ( 2400 760 0 ) ( 2400 760 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 2460 0 ) ( 2080 2460 0 ) ( 2080 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2080 2460 0 ) ( 2080 760 0 ) ( 2080 760 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 760 0 ) ( 2400 2460 0 ) ( 2400 2460 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 2020 760 0 ) ( 2020 2460 0 ) ( 2080 2460 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2080 2460 96 ) ( 2020 2460 96 ) ( 2020 760 96 ) textures/common/caulk 0 0 0 1 1
+( 2020 760 0 ) ( 2080 760 0 ) ( 2080 760 96 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2080 2460 0 ) ( 2020 2460 0 ) ( 2020 2460 96 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2020 2460 0 ) ( 2020 760 0 ) ( 2020 760 96 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2080 760 0 ) ( 2080 2460 0 ) ( 2080 2460 96 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 2080 0 0 ) ( 2080 760 0 ) ( 2400 760 0 ) textures/common/caulk 0 0 0 1 1
+( 2400 760 256 ) ( 2080 760 256 ) ( 2080 0 256 ) textures/common/caulk 0 0 0 1 1
+( 2080 0 0 ) ( 2400 0 0 ) ( 2400 0 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 760 0 ) ( 2080 760 0 ) ( 2080 760 256 ) textures/common/caulk 0 0 0 1 1
+( 2080 760 0 ) ( 2080 0 0 ) ( 2080 0 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 0 0 ) ( 2400 760 0 ) ( 2400 760 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 2080 2460 0 ) ( 2080 3200 0 ) ( 2400 3200 0 ) textures/common/caulk 0 0 0 1 1
+( 2400 3200 256 ) ( 2080 3200 256 ) ( 2080 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2080 2460 0 ) ( 2400 2460 0 ) ( 2400 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 3200 0 ) ( 2080 3200 0 ) ( 2080 3200 256 ) textures/common/caulk 0 0 0 1 1
+( 2080 3200 0 ) ( 2080 2460 0 ) ( 2080 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 2460 0 ) ( 2400 3200 0 ) ( 2400 3200 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 0 100 0 ) ( 0 760 0 ) ( 800 760 0 ) textures/common/caulk 0 0 0 1 1
+( 800 760 256 ) ( 0 760 256 ) ( 0 100 256 ) textures/common/caulk 0 0 0 1 1
+( 0 100 0 ) ( 800 100 0 ) ( 800 100 256 ) textures/common/caulk 0 0 0 1 1
+( 800 760 0 ) ( 0 760 0 ) ( 0 760 256 ) textures/common/caulk 0 0 0 1 1
+( 0 760 0 ) ( 0 100 0 ) ( 0 100 256 ) textures/common/caulk 0 0 0 1 1
+( 800 100 0 ) ( 800 760 0 ) ( 800 760 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 1440 100 0 ) ( 1440 760 0 ) ( 2400 760 0 ) textures/common/caulk 0 0 0 1 1
+( 2400 760 256 ) ( 1440 760 256 ) ( 1440 100 256 ) textures/common/caulk 0 0 0 1 1
+( 1440 100 0 ) ( 2400 100 0 ) ( 2400 100 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 760 0 ) ( 1440 760 0 ) ( 1440 760 256 ) textures/common/caulk 0 0 0 1 1
+( 1440 760 0 ) ( 1440 100 0 ) ( 1440 100 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 100 0 ) ( 2400 760 0 ) ( 2400 760 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 800 100 0 ) ( 800 160 0 ) ( 1440 160 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 160 256 ) ( 800 160 256 ) ( 800 100 256 ) textures/common/caulk 0 0 0 1 1
+( 800 100 0 ) ( 1440 100 0 ) ( 1440 100 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 160 0 ) ( 800 160 0 ) ( 800 160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 800 160 0 ) ( 800 100 0 ) ( 800 100 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 100 0 ) ( 1440 160 0 ) ( 1440 160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 800 160 0 ) ( 800 700 0 ) ( 860 700 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 860 700 256 ) ( 800 700 256 ) ( 800 160 256 ) textures/common/caulk 0 0 0 1 1
+( 800 160 0 ) ( 860 160 0 ) ( 860 160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 860 700 0 ) ( 800 700 0 ) ( 800 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 800 700 0 ) ( 800 160 0 ) ( 800 160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 860 160 0 ) ( 860 700 0 ) ( 860 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1380 160 0 ) ( 1380 700 0 ) ( 1440 700 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 700 256 ) ( 1380 700 256 ) ( 1380 160 256 ) textures/common/caulk 0 0 0 1 1
+( 1380 160 0 ) ( 1440 160 0 ) ( 1440 160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 700 0 ) ( 1380 700 0 ) ( 1380 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1380 700 0 ) ( 1380 160 0 ) ( 1380 160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 160 0 ) ( 1440 700 0 ) ( 1440 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 800 100 254 ) ( 800 760 254 ) ( 1440 760 254 ) textures/common/caulk 0 0 0 1 1
+( 1440 760 256 ) ( 800 760 256 ) ( 800 100 256 ) textures/common/caulk 0 0 0 1 1
+( 800 100 254 ) ( 1440 100 254 ) ( 1440 100 256 ) textures/common/caulk 0 0 0 1 1
+( 1440 760 254 ) ( 800 760 254 ) ( 800 760 256 ) textures/common/caulk 0 0 0 1 1
+( 800 760 254 ) ( 800 100 254 ) ( 800 100 256 ) textures/common/caulk 0 0 0 1 1
+( 1440 100 254 ) ( 1440 760 254 ) ( 1440 760 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 800 700 0 ) ( 800 760 0 ) ( 940 760 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 940 760 256 ) ( 800 760 256 ) ( 800 700 256 ) textures/common/caulk 0 0 0 1 1
+( 800 700 0 ) ( 940 700 0 ) ( 940 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 940 760 0 ) ( 800 760 0 ) ( 800 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 800 760 0 ) ( 800 700 0 ) ( 800 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 940 700 0 ) ( 940 760 0 ) ( 940 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1020 700 0 ) ( 1020 760 0 ) ( 1220 760 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1220 760 256 ) ( 1020 760 256 ) ( 1020 700 256 ) textures/common/caulk 0 0 0 1 1
+( 1020 700 0 ) ( 1220 700 0 ) ( 1220 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1220 760 0 ) ( 1020 760 0 ) ( 1020 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1020 760 0 ) ( 1020 700 0 ) ( 1020 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1220 700 0 ) ( 1220 760 0 ) ( 1220 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1300 700 0 ) ( 1300 760 0 ) ( 1440 760 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 760 256 ) ( 1300 760 256 ) ( 1300 700 256 ) textures/common/caulk 0 0 0 1 1
+( 1300 700 0 ) ( 1440 700 0 ) ( 1440 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 760 0 ) ( 1300 760 0 ) ( 1300 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1300 760 0 ) ( 1300 700 0 ) ( 1300 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 700 0 ) ( 1440 760 0 ) ( 1440 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 940 700 112 ) ( 940 760 112 ) ( 1020 760 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1020 760 256 ) ( 940 760 256 ) ( 940 700 256 ) textures/common/caulk 0 0 0 1 1
+( 940 700 112 ) ( 1020 700 112 ) ( 1020 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1020 760 112 ) ( 940 760 112 ) ( 940 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 940 760 112 ) ( 940 700 112 ) ( 940 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1020 700 112 ) ( 1020 760 112 ) ( 1020 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1220 700 112 ) ( 1220 760 112 ) ( 1300 760 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1300 760 256 ) ( 1220 760 256 ) ( 1220 700 256 ) textures/common/caulk 0 0 0 1 1
+( 1220 700 112 ) ( 1300 700 112 ) ( 1300 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1300 760 112 ) ( 1220 760 112 ) ( 1220 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1220 760 112 ) ( 1220 700 112 ) ( 1220 700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1300 700 112 ) ( 1300 760 112 ) ( 1300 760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 0 760 0 ) ( 0 1100 0 ) ( 440 1100 0 ) textures/common/caulk 0 0 0 1 1
+( 440 1100 256 ) ( 0 1100 256 ) ( 0 760 256 ) textures/common/caulk 0 0 0 1 1
+( 0 760 0 ) ( 440 760 0 ) ( 440 760 256 ) textures/common/caulk 0 0 0 1 1
+( 440 1100 0 ) ( 0 1100 0 ) ( 0 1100 256 ) textures/common/caulk 0 0 0 1 1
+( 0 1100 0 ) ( 0 760 0 ) ( 0 760 256 ) textures/common/caulk 0 0 0 1 1
+( 440 760 0 ) ( 440 1100 0 ) ( 440 1100 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 2000 760 0 ) ( 2000 1200 0 ) ( 2400 1200 0 ) textures/common/caulk 0 0 0 1 1
+( 2400 1200 256 ) ( 2000 1200 256 ) ( 2000 760 256 ) textures/common/caulk 0 0 0 1 1
+( 2000 760 0 ) ( 2400 760 0 ) ( 2400 760 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 1200 0 ) ( 2000 1200 0 ) ( 2000 1200 256 ) textures/common/caulk 0 0 0 1 1
+( 2000 1200 0 ) ( 2000 760 0 ) ( 2000 760 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 760 0 ) ( 2400 1200 0 ) ( 2400 1200 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 900 840 0 ) ( 900 900 0 ) ( 1080 900 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 900 48 ) ( 900 900 48 ) ( 900 840 48 ) textures/common/caulk 0 0 0 1 1
+( 900 840 0 ) ( 1080 840 0 ) ( 1080 840 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 900 0 ) ( 900 900 0 ) ( 900 900 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 900 900 0 ) ( 900 840 0 ) ( 900 840 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 840 0 ) ( 1080 900 0 ) ( 1080 900 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1320 960 0 ) ( 1320 1020 0 ) ( 1480 1020 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1020 64 ) ( 1320 1020 64 ) ( 1320 960 64 ) textures/common/caulk 0 0 0 1 1
+( 1320 960 0 ) ( 1480 960 0 ) ( 1480 960 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1020 0 ) ( 1320 1020 0 ) ( 1320 1020 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1320 1020 0 ) ( 1320 960 0 ) ( 1320 960 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 960 0 ) ( 1480 1020 0 ) ( 1480 1020 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1340 1020 0 ) ( 1340 1080 0 ) ( 1480 1080 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1080 256 ) ( 1340 1080 256 ) ( 1340 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 1340 1020 0 ) ( 1480 1020 0 ) ( 1480 1020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1080 0 ) ( 1340 1080 0 ) ( 1340 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1340 1080 0 ) ( 1340 1020 0 ) ( 1340 1020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1020 0 ) ( 1480 1080 0 ) ( 1480 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1560 1020 0 ) ( 1560 1080 0 ) ( 1940 1080 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1080 256 ) ( 1560 1080 256 ) ( 1560 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 1560 1020 0 ) ( 1940 1020 0 ) ( 1940 1020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1080 0 ) ( 1560 1080 0 ) ( 1560 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1560 1080 0 ) ( 1560 1020 0 ) ( 1560 1020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1020 0 ) ( 1940 1080 0 ) ( 1940 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1480 1020 112 ) ( 1480 1080 112 ) ( 1560 1080 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1560 1080 256 ) ( 1480 1080 256 ) ( 1480 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 1480 1020 112 ) ( 1560 1020 112 ) ( 1560 1020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1560 1080 112 ) ( 1480 1080 112 ) ( 1480 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1080 112 ) ( 1480 1020 112 ) ( 1480 1020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1560 1020 112 ) ( 1560 1080 112 ) ( 1560 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1340 1440 0 ) ( 1340 1500 0 ) ( 1480 1500 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1500 256 ) ( 1340 1500 256 ) ( 1340 1440 256 ) textures/common/caulk 0 0 0 1 1
+( 1340 1440 0 ) ( 1480 1440 0 ) ( 1480 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1500 0 ) ( 1340 1500 0 ) ( 1340 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1340 1500 0 ) ( 1340 1440 0 ) ( 1340 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1440 0 ) ( 1480 1500 0 ) ( 1480 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1560 1440 0 ) ( 1560 1500 0 ) ( 1940 1500 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1500 256 ) ( 1560 1500 256 ) ( 1560 1440 256 ) textures/common/caulk 0 0 0 1 1
+( 1560 1440 0 ) ( 1940 1440 0 ) ( 1940 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1500 0 ) ( 1560 1500 0 ) ( 1560 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1560 1500 0 ) ( 1560 1440 0 ) ( 1560 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1440 0 ) ( 1940 1500 0 ) ( 1940 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1480 1440 112 ) ( 1480 1500 112 ) ( 1560 1500 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1560 1500 256 ) ( 1480 1500 256 ) ( 1480 1440 256 ) textures/common/caulk 0 0 0 1 1
+( 1480 1440 112 ) ( 1560 1440 112 ) ( 1560 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1560 1500 112 ) ( 1480 1500 112 ) ( 1480 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1500 112 ) ( 1480 1440 112 ) ( 1480 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1560 1440 112 ) ( 1560 1500 112 ) ( 1560 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1880 1080 0 ) ( 1880 1160 0 ) ( 1940 1160 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1160 256 ) ( 1880 1160 256 ) ( 1880 1080 256 ) textures/common/caulk 0 0 0 1 1
+( 1880 1080 0 ) ( 1940 1080 0 ) ( 1940 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1160 0 ) ( 1880 1160 0 ) ( 1880 1160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1880 1160 0 ) ( 1880 1080 0 ) ( 1880 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1080 0 ) ( 1940 1160 0 ) ( 1940 1160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1880 1280 0 ) ( 1880 1440 0 ) ( 1940 1440 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1440 256 ) ( 1880 1440 256 ) ( 1880 1280 256 ) textures/common/caulk 0 0 0 1 1
+( 1880 1280 0 ) ( 1940 1280 0 ) ( 1940 1280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1440 0 ) ( 1880 1440 0 ) ( 1880 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1880 1440 0 ) ( 1880 1280 0 ) ( 1880 1280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1280 0 ) ( 1940 1440 0 ) ( 1940 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1880 1160 112 ) ( 1880 1280 112 ) ( 1940 1280 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1280 256 ) ( 1880 1280 256 ) ( 1880 1160 256 ) textures/common/caulk 0 0 0 1 1
+( 1880 1160 112 ) ( 1940 1160 112 ) ( 1940 1160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1280 112 ) ( 1880 1280 112 ) ( 1880 1280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1880 1280 112 ) ( 1880 1160 112 ) ( 1880 1160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1160 112 ) ( 1940 1280 112 ) ( 1940 1280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1340 1080 0 ) ( 1340 1140 0 ) ( 1400 1140 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1140 256 ) ( 1340 1140 256 ) ( 1340 1080 256 ) textures/common/caulk 0 0 0 1 1
+( 1340 1080 0 ) ( 1400 1080 0 ) ( 1400 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1140 0 ) ( 1340 1140 0 ) ( 1340 1140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1340 1140 0 ) ( 1340 1080 0 ) ( 1340 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1080 0 ) ( 1400 1140 0 ) ( 1400 1140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1340 1260 0 ) ( 1340 1440 0 ) ( 1400 1440 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1440 256 ) ( 1340 1440 256 ) ( 1340 1260 256 ) textures/common/caulk 0 0 0 1 1
+( 1340 1260 0 ) ( 1400 1260 0 ) ( 1400 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1440 0 ) ( 1340 1440 0 ) ( 1340 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1340 1440 0 ) ( 1340 1260 0 ) ( 1340 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1260 0 ) ( 1400 1440 0 ) ( 1400 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1340 1140 112 ) ( 1340 1260 112 ) ( 1400 1260 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1260 256 ) ( 1340 1260 256 ) ( 1340 1140 256 ) textures/common/caulk 0 0 0 1 1
+( 1340 1140 112 ) ( 1400 1140 112 ) ( 1400 1140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1260 112 ) ( 1340 1260 112 ) ( 1340 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1340 1260 112 ) ( 1340 1140 112 ) ( 1340 1140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1140 112 ) ( 1400 1260 112 ) ( 1400 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1400 1080 0 ) ( 1400 1200 0 ) ( 1680 1200 0 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1680 1200 256 ) ( 1400 1200 256 ) ( 1400 1080 256 ) textures/common/caulk 0 0 0 1 1
+( 1400 1080 0 ) ( 1680 1080 0 ) ( 1680 1080 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1680 1200 0 ) ( 1400 1200 0 ) ( 1400 1200 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1400 1200 0 ) ( 1400 1080 0 ) ( 1400 1080 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1680 1080 0 ) ( 1680 1200 0 ) ( 1680 1200 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+}
+
+{
+( 1400 1280 0 ) ( 1400 1440 0 ) ( 1680 1440 0 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1680 1440 256 ) ( 1400 1440 256 ) ( 1400 1280 256 ) textures/common/caulk 0 0 0 1 1
+( 1400 1280 0 ) ( 1680 1280 0 ) ( 1680 1280 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1680 1440 0 ) ( 1400 1440 0 ) ( 1400 1440 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1400 1440 0 ) ( 1400 1280 0 ) ( 1400 1280 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1680 1280 0 ) ( 1680 1440 0 ) ( 1680 1440 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+}
+
+{
+( 1400 1200 112 ) ( 1400 1280 112 ) ( 1680 1280 112 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1680 1280 256 ) ( 1400 1280 256 ) ( 1400 1200 256 ) textures/common/caulk 0 0 0 1 1
+( 1400 1200 112 ) ( 1680 1200 112 ) ( 1680 1200 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1680 1280 112 ) ( 1400 1280 112 ) ( 1400 1280 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1400 1280 112 ) ( 1400 1200 112 ) ( 1400 1200 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 1680 1200 112 ) ( 1680 1280 112 ) ( 1680 1280 256 ) textures/mp_carentan/building_int 0 0 0 1 1
+}
+
+{
+( 1340 1020 254 ) ( 1340 1500 254 ) ( 1940 1500 254 ) textures/common/caulk 0 0 0 1 1
+( 1940 1500 256 ) ( 1340 1500 256 ) ( 1340 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 1340 1020 254 ) ( 1940 1020 254 ) ( 1940 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 1500 254 ) ( 1340 1500 254 ) ( 1340 1500 256 ) textures/common/caulk 0 0 0 1 1
+( 1340 1500 254 ) ( 1340 1020 254 ) ( 1340 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 1020 254 ) ( 1940 1500 254 ) ( 1940 1500 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 1940 1020 0 ) ( 1940 1080 0 ) ( 2020 1080 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2020 1080 256 ) ( 1940 1080 256 ) ( 1940 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 1020 0 ) ( 2020 1020 0 ) ( 2020 1020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2020 1080 0 ) ( 1940 1080 0 ) ( 1940 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1080 0 ) ( 1940 1020 0 ) ( 1940 1020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2020 1020 0 ) ( 2020 1080 0 ) ( 2020 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1940 1080 0 ) ( 1940 1500 0 ) ( 2000 1500 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2000 1500 256 ) ( 1940 1500 256 ) ( 1940 1080 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 1080 0 ) ( 2000 1080 0 ) ( 2000 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2000 1500 0 ) ( 1940 1500 0 ) ( 1940 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1500 0 ) ( 1940 1080 0 ) ( 1940 1080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2000 1080 0 ) ( 2000 1500 0 ) ( 2000 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1940 1020 254 ) ( 1940 1560 254 ) ( 2020 1560 254 ) textures/common/caulk 0 0 0 1 1
+( 2020 1560 256 ) ( 1940 1560 256 ) ( 1940 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 1020 254 ) ( 2020 1020 254 ) ( 2020 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 2020 1560 254 ) ( 1940 1560 254 ) ( 1940 1560 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 1560 254 ) ( 1940 1020 254 ) ( 1940 1020 256 ) textures/common/caulk 0 0 0 1 1
+( 2020 1020 254 ) ( 2020 1560 254 ) ( 2020 1560 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 1940 1560 0 ) ( 1940 2460 0 ) ( 2000 2460 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2000 2460 256 ) ( 1940 2460 256 ) ( 1940 1560 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 1560 0 ) ( 2000 1560 0 ) ( 2000 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2000 2460 0 ) ( 1940 2460 0 ) ( 1940 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2460 0 ) ( 1940 1560 0 ) ( 1940 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2000 1560 0 ) ( 2000 2460 0 ) ( 2000 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1700 2020 0 ) ( 1700 2080 0 ) ( 1940 2080 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2080 256 ) ( 1700 2080 256 ) ( 1700 2020 256 ) textures/common/caulk 0 0 0 1 1
+( 1700 2020 0 ) ( 1940 2020 0 ) ( 1940 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2080 0 ) ( 1700 2080 0 ) ( 1700 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2080 0 ) ( 1700 2020 0 ) ( 1700 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2020 0 ) ( 1940 2080 0 ) ( 1940 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1700 2080 0 ) ( 1700 2140 0 ) ( 1760 2140 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1760 2140 256 ) ( 1700 2140 256 ) ( 1700 2080 256 ) textures/common/caulk 0 0 0 1 1
+( 1700 2080 0 ) ( 1760 2080 0 ) ( 1760 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1760 2140 0 ) ( 1700 2140 0 ) ( 1700 2140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2140 0 ) ( 1700 2080 0 ) ( 1700 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1760 2080 0 ) ( 1760 2140 0 ) ( 1760 2140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1700 2080 0 ) ( 1700 2140 0 ) ( 1820 2140 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1820 2140 256 ) ( 1700 2140 256 ) ( 1700 2080 256 ) textures/common/caulk 0 0 0 1 1
+( 1700 2080 0 ) ( 1820 2080 0 ) ( 1820 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1820 2140 0 ) ( 1700 2140 0 ) ( 1700 2140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2140 0 ) ( 1700 2080 0 ) ( 1700 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1820 2080 0 ) ( 1820 2140 0 ) ( 1820 2140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1900 2080 0 ) ( 1900 2140 0 ) ( 1940 2140 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2140 256 ) ( 1900 2140 256 ) ( 1900 2080 256 ) textures/common/caulk 0 0 0 1 1
+( 1900 2080 0 ) ( 1940 2080 0 ) ( 1940 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2140 0 ) ( 1900 2140 0 ) ( 1900 2140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1900 2140 0 ) ( 1900 2080 0 ) ( 1900 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2080 0 ) ( 1940 2140 0 ) ( 1940 2140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1820 2080 112 ) ( 1820 2140 112 ) ( 1900 2140 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1900 2140 256 ) ( 1820 2140 256 ) ( 1820 2080 256 ) textures/common/caulk 0 0 0 1 1
+( 1820 2080 112 ) ( 1900 2080 112 ) ( 1900 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1900 2140 112 ) ( 1820 2140 112 ) ( 1820 2140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1820 2140 112 ) ( 1820 2080 112 ) ( 1820 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1900 2080 112 ) ( 1900 2140 112 ) ( 1900 2140 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1440 2200 0 ) ( 1440 2460 0 ) ( 1500 2460 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1500 2460 256 ) ( 1440 2460 256 ) ( 1440 2200 256 ) textures/common/caulk 0 0 0 1 1
+( 1440 2200 0 ) ( 1500 2200 0 ) ( 1500 2200 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1500 2460 0 ) ( 1440 2460 0 ) ( 1440 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 2460 0 ) ( 1440 2200 0 ) ( 1440 2200 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1500 2200 0 ) ( 1500 2460 0 ) ( 1500 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1500 2380 0 ) ( 1500 2460 0 ) ( 1960 2460 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1960 2460 256 ) ( 1500 2460 256 ) ( 1500 2380 256 ) textures/common/caulk 0 0 0 1 1
+( 1500 2380 0 ) ( 1960 2380 0 ) ( 1960 2380 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1960 2460 0 ) ( 1500 2460 0 ) ( 1500 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1500 2460 0 ) ( 1500 2380 0 ) ( 1500 2380 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1960 2380 0 ) ( 1960 2460 0 ) ( 1960 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1560 2240 0 ) ( 1560 2310 0 ) ( 1700 2310 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2310 56 ) ( 1560 2310 56 ) ( 1560 2240 56 ) textures/common/caulk 0 0 0 1 1
+( 1560 2240 0 ) ( 1700 2240 0 ) ( 1700 2240 56 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2310 0 ) ( 1560 2310 0 ) ( 1560 2310 56 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1560 2310 0 ) ( 1560 2240 0 ) ( 1560 2240 56 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2240 0 ) ( 1700 2310 0 ) ( 1700 2310 56 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1800 2260 0 ) ( 1800 2320 0 ) ( 1860 2320 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1860 2320 64 ) ( 1800 2320 64 ) ( 1800 2260 64 ) textures/common/caulk 0 0 0 1 1
+( 1800 2260 0 ) ( 1860 2260 0 ) ( 1860 2260 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1860 2320 0 ) ( 1800 2320 0 ) ( 1800 2320 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1800 2320 0 ) ( 1800 2260 0 ) ( 1800 2260 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1860 2260 0 ) ( 1860 2320 0 ) ( 1860 2320 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 0 2460 0 ) ( 0 2900 0 ) ( 1760 2900 0 ) textures/common/caulk 0 0 0 1 1
+( 1760 2900 256 ) ( 0 2900 256 ) ( 0 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 0 2460 0 ) ( 1760 2460 0 ) ( 1760 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 1760 2900 0 ) ( 0 2900 0 ) ( 0 2900 256 ) textures/common/caulk 0 0 0 1 1
+( 0 2900 0 ) ( 0 2460 0 ) ( 0 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 1760 2460 0 ) ( 1760 2900 0 ) ( 1760 2900 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 2280 2460 0 ) ( 2280 2900 0 ) ( 2400 2900 0 ) textures/common/caulk 0 0 0 1 1
+( 2400 2900 256 ) ( 2280 2900 256 ) ( 2280 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2280 2460 0 ) ( 2400 2460 0 ) ( 2400 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 2900 0 ) ( 2280 2900 0 ) ( 2280 2900 256 ) textures/common/caulk 0 0 0 1 1
+( 2280 2900 0 ) ( 2280 2460 0 ) ( 2280 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2400 2460 0 ) ( 2400 2900 0 ) ( 2400 2900 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 1760 2840 0 ) ( 1760 2900 0 ) ( 2280 2900 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2280 2900 256 ) ( 1760 2900 256 ) ( 1760 2840 256 ) textures/common/caulk 0 0 0 1 1
+( 1760 2840 0 ) ( 2280 2840 0 ) ( 2280 2840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2280 2900 0 ) ( 1760 2900 0 ) ( 1760 2900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1760 2900 0 ) ( 1760 2840 0 ) ( 1760 2840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2280 2840 0 ) ( 2280 2900 0 ) ( 2280 2900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1760 2460 0 ) ( 1760 2840 0 ) ( 1820 2840 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1820 2840 256 ) ( 1760 2840 256 ) ( 1760 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 1760 2460 0 ) ( 1820 2460 0 ) ( 1820 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1820 2840 0 ) ( 1760 2840 0 ) ( 1760 2840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1760 2840 0 ) ( 1760 2460 0 ) ( 1760 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1820 2460 0 ) ( 1820 2840 0 ) ( 1820 2840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 2220 2460 0 ) ( 2220 2840 0 ) ( 2280 2840 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2280 2840 256 ) ( 2220 2840 256 ) ( 2220 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2220 2460 0 ) ( 2280 2460 0 ) ( 2280 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2280 2840 0 ) ( 2220 2840 0 ) ( 2220 2840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2220 2840 0 ) ( 2220 2460 0 ) ( 2220 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2280 2460 0 ) ( 2280 2840 0 ) ( 2280 2840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1760 2460 254 ) ( 1760 2900 254 ) ( 2280 2900 254 ) textures/common/caulk 0 0 0 1 1
+( 2280 2900 256 ) ( 1760 2900 256 ) ( 1760 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 1760 2460 254 ) ( 2280 2460 254 ) ( 2280 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2280 2900 254 ) ( 1760 2900 254 ) ( 1760 2900 256 ) textures/common/caulk 0 0 0 1 1
+( 1760 2900 254 ) ( 1760 2460 254 ) ( 1760 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2280 2460 254 ) ( 2280 2900 254 ) ( 2280 2900 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 1760 2460 0 ) ( 1760 2520 0 ) ( 1860 2520 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1860 2520 256 ) ( 1760 2520 256 ) ( 1760 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 1760 2460 0 ) ( 1860 2460 0 ) ( 1860 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1860 2520 0 ) ( 1760 2520 0 ) ( 1760 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1760 2520 0 ) ( 1760 2460 0 ) ( 1760 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1860 2460 0 ) ( 1860 2520 0 ) ( 1860 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1940 2460 0 ) ( 1940 2520 0 ) ( 2080 2520 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2080 2520 256 ) ( 1940 2520 256 ) ( 1940 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 2460 0 ) ( 2080 2460 0 ) ( 2080 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2080 2520 0 ) ( 1940 2520 0 ) ( 1940 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2520 0 ) ( 1940 2460 0 ) ( 1940 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2080 2460 0 ) ( 2080 2520 0 ) ( 2080 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 2160 2460 0 ) ( 2160 2520 0 ) ( 2280 2520 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2280 2520 256 ) ( 2160 2520 256 ) ( 2160 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2160 2460 0 ) ( 2280 2460 0 ) ( 2280 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2280 2520 0 ) ( 2160 2520 0 ) ( 2160 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2160 2520 0 ) ( 2160 2460 0 ) ( 2160 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2280 2460 0 ) ( 2280 2520 0 ) ( 2280 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1860 2460 112 ) ( 1860 2520 112 ) ( 1940 2520 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2520 256 ) ( 1860 2520 256 ) ( 1860 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 1860 2460 112 ) ( 1940 2460 112 ) ( 1940 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2520 112 ) ( 1860 2520 112 ) ( 1860 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1860 2520 112 ) ( 1860 2460 112 ) ( 1860 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 2460 112 ) ( 1940 2520 112 ) ( 1940 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 2080 2460 112 ) ( 2080 2520 112 ) ( 2160 2520 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2160 2520 256 ) ( 2080 2520 256 ) ( 2080 2460 256 ) textures/common/caulk 0 0 0 1 1
+( 2080 2460 112 ) ( 2160 2460 112 ) ( 2160 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2160 2520 112 ) ( 2080 2520 112 ) ( 2080 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2080 2520 112 ) ( 2080 2460 112 ) ( 2080 2460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 2160 2460 112 ) ( 2160 2520 112 ) ( 2160 2520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1080 1960 0 ) ( 1080 2400 0 ) ( 1140 2400 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 2400 256 ) ( 1080 2400 256 ) ( 1080 1960 256 ) textures/common/caulk 0 0 0 1 1
+( 1080 1960 0 ) ( 1140 1960 0 ) ( 1140 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 2400 0 ) ( 1080 2400 0 ) ( 1080 2400 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 2400 0 ) ( 1080 1960 0 ) ( 1080 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 1960 0 ) ( 1140 2400 0 ) ( 1140 2400 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1140 2340 0 ) ( 1140 2400 0 ) ( 1700 2400 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2400 256 ) ( 1140 2400 256 ) ( 1140 2340 256 ) textures/common/caulk 0 0 0 1 1
+( 1140 2340 0 ) ( 1700 2340 0 ) ( 1700 2340 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2400 0 ) ( 1140 2400 0 ) ( 1140 2400 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 2400 0 ) ( 1140 2340 0 ) ( 1140 2340 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2340 0 ) ( 1700 2400 0 ) ( 1700 2400 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1640 1960 0 ) ( 1640 2180 0 ) ( 1700 2180 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2180 256 ) ( 1640 2180 256 ) ( 1640 1960 256 ) textures/common/caulk 0 0 0 1 1
+( 1640 1960 0 ) ( 1700 1960 0 ) ( 1700 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2180 0 ) ( 1640 2180 0 ) ( 1640 2180 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 2180 0 ) ( 1640 1960 0 ) ( 1640 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 1960 0 ) ( 1700 2180 0 ) ( 1700 2180 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1640 2280 0 ) ( 1640 2340 0 ) ( 1700 2340 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2340 256 ) ( 1640 2340 256 ) ( 1640 2280 256 ) textures/common/caulk 0 0 0 1 1
+( 1640 2280 0 ) ( 1700 2280 0 ) ( 1700 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2340 0 ) ( 1640 2340 0 ) ( 1640 2340 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 2340 0 ) ( 1640 2280 0 ) ( 1640 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 2280 0 ) ( 1700 2340 0 ) ( 1700 2340 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1140 1960 0 ) ( 1140 2020 0 ) ( 1220 2020 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1220 2020 256 ) ( 1140 2020 256 ) ( 1140 1960 256 ) textures/common/caulk 0 0 0 1 1
+( 1140 1960 0 ) ( 1220 1960 0 ) ( 1220 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1220 2020 0 ) ( 1140 2020 0 ) ( 1140 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 2020 0 ) ( 1140 1960 0 ) ( 1140 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1220 1960 0 ) ( 1220 2020 0 ) ( 1220 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1440 1960 0 ) ( 1440 2020 0 ) ( 1640 2020 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 2020 256 ) ( 1440 2020 256 ) ( 1440 1960 256 ) textures/common/caulk 0 0 0 1 1
+( 1440 1960 0 ) ( 1640 1960 0 ) ( 1640 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 2020 0 ) ( 1440 2020 0 ) ( 1440 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1440 2020 0 ) ( 1440 1960 0 ) ( 1440 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 1960 0 ) ( 1640 2020 0 ) ( 1640 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1330 2120 0 ) ( 1330 2260 0 ) ( 1470 2260 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1470 2260 20 ) ( 1330 2260 20 ) ( 1330 2120 20 ) textures/common/caulk 0 0 0 1 1
+( 1330 2120 0 ) ( 1470 2120 0 ) ( 1470 2120 20 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1470 2260 0 ) ( 1330 2260 0 ) ( 1330 2260 20 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1330 2260 0 ) ( 1330 2120 0 ) ( 1330 2120 20 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1470 2120 0 ) ( 1470 2260 0 ) ( 1470 2260 20 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1355 2145 20 ) ( 1355 2235 20 ) ( 1445 2235 20 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1445 2235 68 ) ( 1355 2235 68 ) ( 1355 2145 68 ) textures/common/caulk 0 0 0 1 1
+( 1355 2145 20 ) ( 1445 2145 20 ) ( 1445 2145 68 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1445 2235 20 ) ( 1355 2235 20 ) ( 1355 2235 68 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1355 2235 20 ) ( 1355 2145 20 ) ( 1355 2145 68 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1445 2145 20 ) ( 1445 2235 20 ) ( 1445 2235 68 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1383 2173 68 ) ( 1383 2207 68 ) ( 1417 2207 68 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1417 2207 196 ) ( 1383 2207 196 ) ( 1383 2173 196 ) textures/common/caulk 0 0 0 1 1
+( 1383 2173 68 ) ( 1417 2173 68 ) ( 1417 2173 196 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1417 2207 68 ) ( 1383 2207 68 ) ( 1383 2207 196 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1383 2207 68 ) ( 1383 2173 68 ) ( 1383 2173 196 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1417 2173 68 ) ( 1417 2207 68 ) ( 1417 2207 196 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1280 2090 0 ) ( 1280 2115 0 ) ( 1520 2115 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1520 2115 36 ) ( 1280 2115 36 ) ( 1280 2090 36 ) textures/common/caulk 0 0 0 1 1
+( 1280 2090 0 ) ( 1520 2090 0 ) ( 1520 2090 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1520 2115 0 ) ( 1280 2115 0 ) ( 1280 2115 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1280 2115 0 ) ( 1280 2090 0 ) ( 1280 2090 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1520 2090 0 ) ( 1520 2115 0 ) ( 1520 2115 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1280 2285 0 ) ( 1280 2310 0 ) ( 1520 2310 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1520 2310 36 ) ( 1280 2310 36 ) ( 1280 2285 36 ) textures/common/caulk 0 0 0 1 1
+( 1280 2285 0 ) ( 1520 2285 0 ) ( 1520 2285 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1520 2310 0 ) ( 1280 2310 0 ) ( 1280 2310 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1280 2310 0 ) ( 1280 2285 0 ) ( 1280 2285 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1520 2285 0 ) ( 1520 2310 0 ) ( 1520 2310 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1280 2115 0 ) ( 1280 2285 0 ) ( 1305 2285 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1305 2285 36 ) ( 1280 2285 36 ) ( 1280 2115 36 ) textures/common/caulk 0 0 0 1 1
+( 1280 2115 0 ) ( 1305 2115 0 ) ( 1305 2115 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1305 2285 0 ) ( 1280 2285 0 ) ( 1280 2285 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1280 2285 0 ) ( 1280 2115 0 ) ( 1280 2115 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1305 2115 0 ) ( 1305 2285 0 ) ( 1305 2285 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1495 2115 0 ) ( 1495 2285 0 ) ( 1520 2285 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1520 2285 36 ) ( 1495 2285 36 ) ( 1495 2115 36 ) textures/common/caulk 0 0 0 1 1
+( 1495 2115 0 ) ( 1520 2115 0 ) ( 1520 2115 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1520 2285 0 ) ( 1495 2285 0 ) ( 1495 2285 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1495 2285 0 ) ( 1495 2115 0 ) ( 1495 2115 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1520 2115 0 ) ( 1520 2285 0 ) ( 1520 2285 36 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1080 1800 0 ) ( 1080 1960 0 ) ( 1140 1960 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 1960 256 ) ( 1080 1960 256 ) ( 1080 1800 256 ) textures/common/caulk 0 0 0 1 1
+( 1080 1800 0 ) ( 1140 1800 0 ) ( 1140 1800 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 1960 0 ) ( 1080 1960 0 ) ( 1080 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 1960 0 ) ( 1080 1800 0 ) ( 1080 1800 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 1800 0 ) ( 1140 1960 0 ) ( 1140 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1640 1800 0 ) ( 1640 1960 0 ) ( 1700 1960 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 1960 256 ) ( 1640 1960 256 ) ( 1640 1800 256 ) textures/common/caulk 0 0 0 1 1
+( 1640 1800 0 ) ( 1700 1800 0 ) ( 1700 1800 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 1960 0 ) ( 1640 1960 0 ) ( 1640 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 1960 0 ) ( 1640 1800 0 ) ( 1640 1800 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1700 1800 0 ) ( 1700 1960 0 ) ( 1700 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1140 1880 0 ) ( 1140 1940 0 ) ( 1320 1940 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1320 1940 256 ) ( 1140 1940 256 ) ( 1140 1880 256 ) textures/common/caulk 0 0 0 1 1
+( 1140 1880 0 ) ( 1320 1880 0 ) ( 1320 1880 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1320 1940 0 ) ( 1140 1940 0 ) ( 1140 1940 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 1940 0 ) ( 1140 1880 0 ) ( 1140 1880 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1320 1880 0 ) ( 1320 1940 0 ) ( 1320 1940 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1420 1880 0 ) ( 1420 1940 0 ) ( 1640 1940 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 1940 256 ) ( 1420 1940 256 ) ( 1420 1880 256 ) textures/common/caulk 0 0 0 1 1
+( 1420 1880 0 ) ( 1640 1880 0 ) ( 1640 1880 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 1940 0 ) ( 1420 1940 0 ) ( 1420 1940 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1420 1940 0 ) ( 1420 1880 0 ) ( 1420 1880 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 1880 0 ) ( 1640 1940 0 ) ( 1640 1940 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1320 1880 112 ) ( 1320 1940 112 ) ( 1420 1940 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1420 1940 256 ) ( 1320 1940 256 ) ( 1320 1880 256 ) textures/common/caulk 0 0 0 1 1
+( 1320 1880 112 ) ( 1420 1880 112 ) ( 1420 1880 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1420 1940 112 ) ( 1320 1940 112 ) ( 1320 1940 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1320 1940 112 ) ( 1320 1880 112 ) ( 1320 1880 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1420 1880 112 ) ( 1420 1940 112 ) ( 1420 1940 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1460 1830 0 ) ( 1460 1850 0 ) ( 1480 1850 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1850 220 ) ( 1460 1850 220 ) ( 1460 1830 220 ) textures/common/caulk 0 0 0 1 1
+( 1460 1830 0 ) ( 1480 1830 0 ) ( 1480 1830 220 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1850 0 ) ( 1460 1850 0 ) ( 1460 1850 220 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1460 1850 0 ) ( 1460 1830 0 ) ( 1460 1830 220 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1830 0 ) ( 1480 1850 0 ) ( 1480 1850 220 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1140 1620 0 ) ( 1140 1800 0 ) ( 1200 1800 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1200 1800 256 ) ( 1140 1800 256 ) ( 1140 1620 256 ) textures/common/caulk 0 0 0 1 1
+( 1140 1620 0 ) ( 1200 1620 0 ) ( 1200 1620 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1200 1800 0 ) ( 1140 1800 0 ) ( 1140 1800 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 1800 0 ) ( 1140 1620 0 ) ( 1140 1620 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1200 1620 0 ) ( 1200 1800 0 ) ( 1200 1800 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1420 1620 0 ) ( 1420 1800 0 ) ( 1480 1800 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1800 256 ) ( 1420 1800 256 ) ( 1420 1620 256 ) textures/common/caulk 0 0 0 1 1
+( 1420 1620 0 ) ( 1480 1620 0 ) ( 1480 1620 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1800 0 ) ( 1420 1800 0 ) ( 1420 1800 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1420 1800 0 ) ( 1420 1620 0 ) ( 1420 1620 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1620 0 ) ( 1480 1800 0 ) ( 1480 1800 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1480 1500 0 ) ( 1480 1560 0 ) ( 1940 1560 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1560 256 ) ( 1480 1560 256 ) ( 1480 1500 256 ) textures/common/caulk 0 0 0 1 1
+( 1480 1500 0 ) ( 1940 1500 0 ) ( 1940 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1560 0 ) ( 1480 1560 0 ) ( 1480 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1560 0 ) ( 1480 1500 0 ) ( 1480 1500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1500 0 ) ( 1940 1560 0 ) ( 1940 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1880 1560 0 ) ( 1880 1900 0 ) ( 1940 1900 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1900 256 ) ( 1880 1900 256 ) ( 1880 1560 256 ) textures/common/caulk 0 0 0 1 1
+( 1880 1560 0 ) ( 1940 1560 0 ) ( 1940 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1900 0 ) ( 1880 1900 0 ) ( 1880 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1880 1900 0 ) ( 1880 1560 0 ) ( 1880 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1560 0 ) ( 1940 1900 0 ) ( 1940 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1480 1500 254 ) ( 1480 1960 254 ) ( 1940 1960 254 ) textures/common/caulk 0 0 0 1 1
+( 1940 1960 256 ) ( 1480 1960 256 ) ( 1480 1500 256 ) textures/common/caulk 0 0 0 1 1
+( 1480 1500 254 ) ( 1940 1500 254 ) ( 1940 1500 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 1960 254 ) ( 1480 1960 254 ) ( 1480 1960 256 ) textures/common/caulk 0 0 0 1 1
+( 1480 1960 254 ) ( 1480 1500 254 ) ( 1480 1500 256 ) textures/common/caulk 0 0 0 1 1
+( 1940 1500 254 ) ( 1940 1960 254 ) ( 1940 1960 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 1480 1900 0 ) ( 1480 1960 0 ) ( 1640 1960 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 1960 256 ) ( 1480 1960 256 ) ( 1480 1900 256 ) textures/common/caulk 0 0 0 1 1
+( 1480 1900 0 ) ( 1640 1900 0 ) ( 1640 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 1960 0 ) ( 1480 1960 0 ) ( 1480 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1960 0 ) ( 1480 1900 0 ) ( 1480 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 1900 0 ) ( 1640 1960 0 ) ( 1640 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1720 1900 0 ) ( 1720 1960 0 ) ( 1940 1960 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1960 256 ) ( 1720 1960 256 ) ( 1720 1900 256 ) textures/common/caulk 0 0 0 1 1
+( 1720 1900 0 ) ( 1940 1900 0 ) ( 1940 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1960 0 ) ( 1720 1960 0 ) ( 1720 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1720 1960 0 ) ( 1720 1900 0 ) ( 1720 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1940 1900 0 ) ( 1940 1960 0 ) ( 1940 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1640 1900 112 ) ( 1640 1960 112 ) ( 1720 1960 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1720 1960 256 ) ( 1640 1960 256 ) ( 1640 1900 256 ) textures/common/caulk 0 0 0 1 1
+( 1640 1900 112 ) ( 1720 1900 112 ) ( 1720 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1720 1960 112 ) ( 1640 1960 112 ) ( 1640 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1640 1960 112 ) ( 1640 1900 112 ) ( 1640 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1720 1900 112 ) ( 1720 1960 112 ) ( 1720 1960 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1480 1560 0 ) ( 1480 1680 0 ) ( 1540 1680 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1680 256 ) ( 1480 1680 256 ) ( 1480 1560 256 ) textures/common/caulk 0 0 0 1 1
+( 1480 1560 0 ) ( 1540 1560 0 ) ( 1540 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1680 0 ) ( 1480 1680 0 ) ( 1480 1680 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1680 0 ) ( 1480 1560 0 ) ( 1480 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1560 0 ) ( 1540 1680 0 ) ( 1540 1680 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1480 1680 0 ) ( 1480 1780 0 ) ( 1540 1780 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1780 48 ) ( 1480 1780 48 ) ( 1480 1680 48 ) textures/common/caulk 0 0 0 1 1
+( 1480 1680 0 ) ( 1540 1680 0 ) ( 1540 1680 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1780 0 ) ( 1480 1780 0 ) ( 1480 1780 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1780 0 ) ( 1480 1680 0 ) ( 1480 1680 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1680 0 ) ( 1540 1780 0 ) ( 1540 1780 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1480 1680 104 ) ( 1480 1780 104 ) ( 1540 1780 104 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1780 256 ) ( 1480 1780 256 ) ( 1480 1680 256 ) textures/common/caulk 0 0 0 1 1
+( 1480 1680 104 ) ( 1540 1680 104 ) ( 1540 1680 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1780 104 ) ( 1480 1780 104 ) ( 1480 1780 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1780 104 ) ( 1480 1680 104 ) ( 1480 1680 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1680 104 ) ( 1540 1780 104 ) ( 1540 1780 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1480 1780 0 ) ( 1480 1900 0 ) ( 1540 1900 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1900 256 ) ( 1480 1900 256 ) ( 1480 1780 256 ) textures/common/caulk 0 0 0 1 1
+( 1480 1780 0 ) ( 1540 1780 0 ) ( 1540 1780 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1900 0 ) ( 1480 1900 0 ) ( 1480 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1900 0 ) ( 1480 1780 0 ) ( 1480 1780 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1540 1780 0 ) ( 1540 1900 0 ) ( 1540 1900 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1200 1440 0 ) ( 1200 1640 0 ) ( 1260 1640 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1640 256 ) ( 1200 1640 256 ) ( 1200 1440 256 ) textures/common/caulk 0 0 0 1 1
+( 1200 1440 0 ) ( 1260 1440 0 ) ( 1260 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1640 0 ) ( 1200 1640 0 ) ( 1200 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1200 1640 0 ) ( 1200 1440 0 ) ( 1200 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1440 0 ) ( 1260 1640 0 ) ( 1260 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1420 1440 0 ) ( 1420 1640 0 ) ( 1480 1640 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1640 256 ) ( 1420 1640 256 ) ( 1420 1440 256 ) textures/common/caulk 0 0 0 1 1
+( 1420 1440 0 ) ( 1480 1440 0 ) ( 1480 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1640 0 ) ( 1420 1640 0 ) ( 1420 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1420 1640 0 ) ( 1420 1440 0 ) ( 1420 1440 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1480 1440 0 ) ( 1480 1640 0 ) ( 1480 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1260 1540 0 ) ( 1260 1590 0 ) ( 1330 1590 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1330 1590 80 ) ( 1260 1590 80 ) ( 1260 1540 80 ) textures/common/caulk 0 0 0 1 1
+( 1260 1540 0 ) ( 1330 1540 0 ) ( 1330 1540 80 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1330 1590 0 ) ( 1260 1590 0 ) ( 1260 1590 80 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1590 0 ) ( 1260 1540 0 ) ( 1260 1540 80 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1330 1540 0 ) ( 1330 1590 0 ) ( 1330 1590 80 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1380 1540 0 ) ( 1380 1590 0 ) ( 1420 1590 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1420 1590 80 ) ( 1380 1590 80 ) ( 1380 1540 80 ) textures/common/caulk 0 0 0 1 1
+( 1380 1540 0 ) ( 1420 1540 0 ) ( 1420 1540 80 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1420 1590 0 ) ( 1380 1590 0 ) ( 1380 1590 80 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1380 1590 0 ) ( 1380 1540 0 ) ( 1380 1540 80 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1420 1540 0 ) ( 1420 1590 0 ) ( 1420 1590 80 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1260 1450 0 ) ( 1260 1530 0 ) ( 1400 1530 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1530 72 ) ( 1260 1530 72 ) ( 1260 1450 72 ) textures/common/caulk 0 0 0 1 1
+( 1260 1450 0 ) ( 1400 1450 0 ) ( 1400 1450 72 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1530 0 ) ( 1260 1530 0 ) ( 1260 1530 72 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1530 0 ) ( 1260 1450 0 ) ( 1260 1450 72 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1400 1450 0 ) ( 1400 1530 0 ) ( 1400 1530 72 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1290 1470 72 ) ( 1290 1510 72 ) ( 1370 1510 72 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1370 1510 96 ) ( 1290 1510 96 ) ( 1290 1470 96 ) textures/common/caulk 0 0 0 1 1
+( 1290 1470 72 ) ( 1370 1470 72 ) ( 1370 1470 96 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1370 1510 72 ) ( 1290 1510 72 ) ( 1290 1510 96 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1290 1510 72 ) ( 1290 1470 72 ) ( 1290 1470 96 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1370 1470 72 ) ( 1370 1510 72 ) ( 1370 1510 96 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1000 1360 0 ) ( 1000 1420 0 ) ( 1260 1420 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1420 256 ) ( 1000 1420 256 ) ( 1000 1360 256 ) textures/common/caulk 0 0 0 1 1
+( 1000 1360 0 ) ( 1260 1360 0 ) ( 1260 1360 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1420 0 ) ( 1000 1420 0 ) ( 1000 1420 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1420 0 ) ( 1000 1360 0 ) ( 1000 1360 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1360 0 ) ( 1260 1420 0 ) ( 1260 1420 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1000 1360 0 ) ( 1000 1580 0 ) ( 1060 1580 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1060 1580 256 ) ( 1000 1580 256 ) ( 1000 1360 256 ) textures/common/caulk 0 0 0 1 1
+( 1000 1360 0 ) ( 1060 1360 0 ) ( 1060 1360 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1060 1580 0 ) ( 1000 1580 0 ) ( 1000 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1580 0 ) ( 1000 1360 0 ) ( 1000 1360 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1060 1360 0 ) ( 1060 1580 0 ) ( 1060 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1000 1360 254 ) ( 1000 1640 254 ) ( 1260 1640 254 ) textures/common/caulk 0 0 0 1 1
+( 1260 1640 256 ) ( 1000 1640 256 ) ( 1000 1360 256 ) textures/common/caulk 0 0 0 1 1
+( 1000 1360 254 ) ( 1260 1360 254 ) ( 1260 1360 256 ) textures/common/caulk 0 0 0 1 1
+( 1260 1640 254 ) ( 1000 1640 254 ) ( 1000 1640 256 ) textures/common/caulk 0 0 0 1 1
+( 1000 1640 254 ) ( 1000 1360 254 ) ( 1000 1360 256 ) textures/common/caulk 0 0 0 1 1
+( 1260 1360 254 ) ( 1260 1640 254 ) ( 1260 1640 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 1000 1580 0 ) ( 1000 1640 0 ) ( 1080 1640 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 1640 256 ) ( 1000 1640 256 ) ( 1000 1580 256 ) textures/common/caulk 0 0 0 1 1
+( 1000 1580 0 ) ( 1080 1580 0 ) ( 1080 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 1640 0 ) ( 1000 1640 0 ) ( 1000 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1640 0 ) ( 1000 1580 0 ) ( 1000 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 1580 0 ) ( 1080 1640 0 ) ( 1080 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1160 1580 0 ) ( 1160 1640 0 ) ( 1260 1640 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1640 256 ) ( 1160 1640 256 ) ( 1160 1580 256 ) textures/common/caulk 0 0 0 1 1
+( 1160 1580 0 ) ( 1260 1580 0 ) ( 1260 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1640 0 ) ( 1160 1640 0 ) ( 1160 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1160 1640 0 ) ( 1160 1580 0 ) ( 1160 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1580 0 ) ( 1260 1640 0 ) ( 1260 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1080 1580 112 ) ( 1080 1640 112 ) ( 1160 1640 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1160 1640 256 ) ( 1080 1640 256 ) ( 1080 1580 256 ) textures/common/caulk 0 0 0 1 1
+( 1080 1580 112 ) ( 1160 1580 112 ) ( 1160 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1160 1640 112 ) ( 1080 1640 112 ) ( 1080 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 1640 112 ) ( 1080 1580 112 ) ( 1080 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1160 1580 112 ) ( 1160 1640 112 ) ( 1160 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1200 1420 0 ) ( 1200 1460 0 ) ( 1260 1460 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1460 256 ) ( 1200 1460 256 ) ( 1200 1420 256 ) textures/common/caulk 0 0 0 1 1
+( 1200 1420 0 ) ( 1260 1420 0 ) ( 1260 1420 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1460 0 ) ( 1200 1460 0 ) ( 1200 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1200 1460 0 ) ( 1200 1420 0 ) ( 1200 1420 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1420 0 ) ( 1260 1460 0 ) ( 1260 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1200 1560 0 ) ( 1200 1580 0 ) ( 1260 1580 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1580 256 ) ( 1200 1580 256 ) ( 1200 1560 256 ) textures/common/caulk 0 0 0 1 1
+( 1200 1560 0 ) ( 1260 1560 0 ) ( 1260 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1580 0 ) ( 1200 1580 0 ) ( 1200 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1200 1580 0 ) ( 1200 1560 0 ) ( 1200 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1560 0 ) ( 1260 1580 0 ) ( 1260 1580 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1200 1460 112 ) ( 1200 1560 112 ) ( 1260 1560 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1560 256 ) ( 1200 1560 256 ) ( 1200 1460 256 ) textures/common/caulk 0 0 0 1 1
+( 1200 1460 112 ) ( 1260 1460 112 ) ( 1260 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1560 112 ) ( 1200 1560 112 ) ( 1200 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1200 1560 112 ) ( 1200 1460 112 ) ( 1200 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1260 1460 112 ) ( 1260 1560 112 ) ( 1260 1560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1460 0 ) ( 540 1520 0 ) ( 680 1520 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 1520 256 ) ( 540 1520 256 ) ( 540 1460 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1460 0 ) ( 680 1460 0 ) ( 680 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 1520 0 ) ( 540 1520 0 ) ( 540 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1520 0 ) ( 540 1460 0 ) ( 540 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 1460 0 ) ( 680 1520 0 ) ( 680 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 760 1460 0 ) ( 760 1520 0 ) ( 1000 1520 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1520 256 ) ( 760 1520 256 ) ( 760 1460 256 ) textures/common/caulk 0 0 0 1 1
+( 760 1460 0 ) ( 1000 1460 0 ) ( 1000 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1520 0 ) ( 760 1520 0 ) ( 760 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 760 1520 0 ) ( 760 1460 0 ) ( 760 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1460 0 ) ( 1000 1520 0 ) ( 1000 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 680 1460 112 ) ( 680 1520 112 ) ( 760 1520 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 760 1520 256 ) ( 680 1520 256 ) ( 680 1460 256 ) textures/common/caulk 0 0 0 1 1
+( 680 1460 112 ) ( 760 1460 112 ) ( 760 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 760 1520 112 ) ( 680 1520 112 ) ( 680 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 1520 112 ) ( 680 1460 112 ) ( 680 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 760 1460 112 ) ( 760 1520 112 ) ( 760 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1920 0 ) ( 540 1980 0 ) ( 680 1980 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 1980 256 ) ( 540 1980 256 ) ( 540 1920 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1920 0 ) ( 680 1920 0 ) ( 680 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 1980 0 ) ( 540 1980 0 ) ( 540 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1980 0 ) ( 540 1920 0 ) ( 540 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 1920 0 ) ( 680 1980 0 ) ( 680 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 760 1920 0 ) ( 760 1980 0 ) ( 1000 1980 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1980 256 ) ( 760 1980 256 ) ( 760 1920 256 ) textures/common/caulk 0 0 0 1 1
+( 760 1920 0 ) ( 1000 1920 0 ) ( 1000 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1980 0 ) ( 760 1980 0 ) ( 760 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 760 1980 0 ) ( 760 1920 0 ) ( 760 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1920 0 ) ( 1000 1980 0 ) ( 1000 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 680 1920 112 ) ( 680 1980 112 ) ( 760 1980 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 760 1980 256 ) ( 680 1980 256 ) ( 680 1920 256 ) textures/common/caulk 0 0 0 1 1
+( 680 1920 112 ) ( 760 1920 112 ) ( 760 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 760 1980 112 ) ( 680 1980 112 ) ( 680 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 1980 112 ) ( 680 1920 112 ) ( 680 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 760 1920 112 ) ( 760 1980 112 ) ( 760 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 940 1520 0 ) ( 940 1640 0 ) ( 1000 1640 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1640 256 ) ( 940 1640 256 ) ( 940 1520 256 ) textures/common/caulk 0 0 0 1 1
+( 940 1520 0 ) ( 1000 1520 0 ) ( 1000 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1640 0 ) ( 940 1640 0 ) ( 940 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 940 1640 0 ) ( 940 1520 0 ) ( 940 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1520 0 ) ( 1000 1640 0 ) ( 1000 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 940 1760 0 ) ( 940 1920 0 ) ( 1000 1920 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1920 256 ) ( 940 1920 256 ) ( 940 1760 256 ) textures/common/caulk 0 0 0 1 1
+( 940 1760 0 ) ( 1000 1760 0 ) ( 1000 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1920 0 ) ( 940 1920 0 ) ( 940 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 940 1920 0 ) ( 940 1760 0 ) ( 940 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1760 0 ) ( 1000 1920 0 ) ( 1000 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 940 1640 112 ) ( 940 1760 112 ) ( 1000 1760 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1760 256 ) ( 940 1760 256 ) ( 940 1640 256 ) textures/common/caulk 0 0 0 1 1
+( 940 1640 112 ) ( 1000 1640 112 ) ( 1000 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1760 112 ) ( 940 1760 112 ) ( 940 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 940 1760 112 ) ( 940 1640 112 ) ( 940 1640 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1640 112 ) ( 1000 1760 112 ) ( 1000 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1520 0 ) ( 540 1920 0 ) ( 600 1920 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1920 256 ) ( 540 1920 256 ) ( 540 1520 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1520 0 ) ( 600 1520 0 ) ( 600 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1920 0 ) ( 540 1920 0 ) ( 540 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1920 0 ) ( 540 1520 0 ) ( 540 1520 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1520 0 ) ( 600 1920 0 ) ( 600 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1460 254 ) ( 540 1980 254 ) ( 1000 1980 254 ) textures/common/caulk 0 0 0 1 1
+( 1000 1980 256 ) ( 540 1980 256 ) ( 540 1460 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1460 254 ) ( 1000 1460 254 ) ( 1000 1460 256 ) textures/common/caulk 0 0 0 1 1
+( 1000 1980 254 ) ( 540 1980 254 ) ( 540 1980 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1980 254 ) ( 540 1460 254 ) ( 540 1460 256 ) textures/common/caulk 0 0 0 1 1
+( 1000 1460 254 ) ( 1000 1980 254 ) ( 1000 1980 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 380 1700 0 ) ( 380 1760 0 ) ( 460 1760 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 460 1760 256 ) ( 380 1760 256 ) ( 380 1700 256 ) textures/common/caulk 0 0 0 1 1
+( 380 1700 0 ) ( 460 1700 0 ) ( 460 1700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 460 1760 0 ) ( 380 1760 0 ) ( 380 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 380 1760 0 ) ( 380 1700 0 ) ( 380 1700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 460 1700 0 ) ( 460 1760 0 ) ( 460 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1700 0 ) ( 540 1760 0 ) ( 600 1760 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1760 256 ) ( 540 1760 256 ) ( 540 1700 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1700 0 ) ( 600 1700 0 ) ( 600 1700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1760 0 ) ( 540 1760 0 ) ( 540 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1760 0 ) ( 540 1700 0 ) ( 540 1700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1700 0 ) ( 600 1760 0 ) ( 600 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 460 1700 112 ) ( 460 1760 112 ) ( 540 1760 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1760 256 ) ( 460 1760 256 ) ( 460 1700 256 ) textures/common/caulk 0 0 0 1 1
+( 460 1700 112 ) ( 540 1700 112 ) ( 540 1700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1760 112 ) ( 460 1760 112 ) ( 460 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 460 1760 112 ) ( 460 1700 112 ) ( 460 1700 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1700 112 ) ( 540 1760 112 ) ( 540 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 380 2020 0 ) ( 380 2080 0 ) ( 600 2080 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 2080 256 ) ( 380 2080 256 ) ( 380 2020 256 ) textures/common/caulk 0 0 0 1 1
+( 380 2020 0 ) ( 600 2020 0 ) ( 600 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 2080 0 ) ( 380 2080 0 ) ( 380 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 380 2080 0 ) ( 380 2020 0 ) ( 380 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 2020 0 ) ( 600 2080 0 ) ( 600 2080 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 380 1760 0 ) ( 380 2020 0 ) ( 440 2020 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 2020 256 ) ( 380 2020 256 ) ( 380 1760 256 ) textures/common/caulk 0 0 0 1 1
+( 380 1760 0 ) ( 440 1760 0 ) ( 440 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 2020 0 ) ( 380 2020 0 ) ( 380 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 380 2020 0 ) ( 380 1760 0 ) ( 380 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 1760 0 ) ( 440 2020 0 ) ( 440 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 380 1700 254 ) ( 380 2080 254 ) ( 600 2080 254 ) textures/common/caulk 0 0 0 1 1
+( 600 2080 256 ) ( 380 2080 256 ) ( 380 1700 256 ) textures/common/caulk 0 0 0 1 1
+( 380 1700 254 ) ( 600 1700 254 ) ( 600 1700 256 ) textures/common/caulk 0 0 0 1 1
+( 600 2080 254 ) ( 380 2080 254 ) ( 380 2080 256 ) textures/common/caulk 0 0 0 1 1
+( 380 2080 254 ) ( 380 1700 254 ) ( 380 1700 256 ) textures/common/caulk 0 0 0 1 1
+( 600 1700 254 ) ( 600 2080 254 ) ( 600 2080 256 ) textures/common/caulk 0 0 0 1 1
+}
+
+{
+( 540 1760 0 ) ( 540 1840 0 ) ( 600 1840 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1840 32 ) ( 540 1840 32 ) ( 540 1760 32 ) textures/common/caulk 0 0 0 1 1
+( 540 1760 0 ) ( 600 1760 0 ) ( 600 1760 32 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1840 0 ) ( 540 1840 0 ) ( 540 1840 32 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1840 0 ) ( 540 1760 0 ) ( 540 1760 32 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1760 0 ) ( 600 1840 0 ) ( 600 1840 32 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1760 80 ) ( 540 1840 80 ) ( 600 1840 80 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1840 256 ) ( 540 1840 256 ) ( 540 1760 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1760 80 ) ( 600 1760 80 ) ( 600 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1840 80 ) ( 540 1840 80 ) ( 540 1840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1840 80 ) ( 540 1760 80 ) ( 540 1760 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1760 80 ) ( 600 1840 80 ) ( 600 1840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1840 0 ) ( 540 1920 0 ) ( 600 1920 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1920 256 ) ( 540 1920 256 ) ( 540 1840 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1840 0 ) ( 600 1840 0 ) ( 600 1840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1920 0 ) ( 540 1920 0 ) ( 540 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1920 0 ) ( 540 1840 0 ) ( 540 1840 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1840 0 ) ( 600 1920 0 ) ( 600 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1920 0 ) ( 540 2020 0 ) ( 600 2020 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 2020 48 ) ( 540 2020 48 ) ( 540 1920 48 ) textures/common/caulk 0 0 0 1 1
+( 540 1920 0 ) ( 600 1920 0 ) ( 600 1920 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 2020 0 ) ( 540 2020 0 ) ( 540 2020 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 2020 0 ) ( 540 1920 0 ) ( 540 1920 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1920 0 ) ( 600 2020 0 ) ( 600 2020 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1920 104 ) ( 540 2020 104 ) ( 600 2020 104 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 2020 256 ) ( 540 2020 256 ) ( 540 1920 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1920 104 ) ( 600 1920 104 ) ( 600 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 2020 104 ) ( 540 2020 104 ) ( 540 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 2020 104 ) ( 540 1920 104 ) ( 540 1920 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1920 104 ) ( 600 2020 104 ) ( 600 2020 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 440 1960 0 ) ( 440 2020 0 ) ( 540 2020 0 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 540 2020 40 ) ( 440 2020 40 ) ( 440 1960 40 ) textures/common/caulk 0 0 0 1 1
+( 440 1960 0 ) ( 540 1960 0 ) ( 540 1960 40 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 540 2020 0 ) ( 440 2020 0 ) ( 440 2020 40 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 440 2020 0 ) ( 440 1960 0 ) ( 440 1960 40 ) textures/mp_carentan/building_int 0 0 0 1 1
+( 540 1960 0 ) ( 540 2020 0 ) ( 540 2020 40 ) textures/mp_carentan/building_int 0 0 0 1 1
+}
+
+{
+( 540 1200 0 ) ( 540 1260 0 ) ( 1000 1260 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1260 256 ) ( 540 1260 256 ) ( 540 1200 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1200 0 ) ( 1000 1200 0 ) ( 1000 1200 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1260 0 ) ( 540 1260 0 ) ( 540 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1260 0 ) ( 540 1200 0 ) ( 540 1200 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1200 0 ) ( 1000 1260 0 ) ( 1000 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 540 1260 0 ) ( 540 1460 0 ) ( 600 1460 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1460 256 ) ( 540 1460 256 ) ( 540 1260 256 ) textures/common/caulk 0 0 0 1 1
+( 540 1260 0 ) ( 600 1260 0 ) ( 600 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1460 0 ) ( 540 1460 0 ) ( 540 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 540 1460 0 ) ( 540 1260 0 ) ( 540 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1260 0 ) ( 600 1460 0 ) ( 600 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 940 1260 0 ) ( 940 1460 0 ) ( 1000 1460 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1460 256 ) ( 940 1460 256 ) ( 940 1260 256 ) textures/common/caulk 0 0 0 1 1
+( 940 1260 0 ) ( 1000 1260 0 ) ( 1000 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1460 0 ) ( 940 1460 0 ) ( 940 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 940 1460 0 ) ( 940 1260 0 ) ( 940 1260 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1000 1260 0 ) ( 1000 1460 0 ) ( 1000 1460 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 640 1300 0 ) ( 640 1360 0 ) ( 860 1360 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 860 1360 56 ) ( 640 1360 56 ) ( 640 1300 56 ) textures/common/caulk 0 0 0 1 1
+( 640 1300 0 ) ( 860 1300 0 ) ( 860 1300 56 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 860 1360 0 ) ( 640 1360 0 ) ( 640 1360 56 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 1360 0 ) ( 640 1300 0 ) ( 640 1300 56 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 860 1300 0 ) ( 860 1360 0 ) ( 860 1360 56 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 600 1380 0 ) ( 600 1460 0 ) ( 660 1460 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 660 1460 32 ) ( 600 1460 32 ) ( 600 1380 32 ) textures/common/caulk 0 0 0 1 1
+( 600 1380 0 ) ( 660 1380 0 ) ( 660 1380 32 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 660 1460 0 ) ( 600 1460 0 ) ( 600 1460 32 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1460 0 ) ( 600 1380 0 ) ( 600 1380 32 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 660 1380 0 ) ( 660 1460 0 ) ( 660 1460 32 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 600 1380 32 ) ( 600 1460 32 ) ( 660 1460 32 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 660 1460 64 ) ( 600 1460 64 ) ( 600 1380 64 ) textures/common/caulk 0 0 0 1 1
+( 600 1380 32 ) ( 660 1380 32 ) ( 660 1380 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 660 1460 32 ) ( 600 1460 32 ) ( 600 1460 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 600 1460 32 ) ( 600 1380 32 ) ( 600 1380 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 660 1380 32 ) ( 660 1460 32 ) ( 660 1460 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 0 1100 0 ) ( 0 1160 0 ) ( 440 1160 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 1160 256 ) ( 0 1160 256 ) ( 0 1100 256 ) textures/common/caulk 0 0 0 1 1
+( 0 1100 0 ) ( 440 1100 0 ) ( 440 1100 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 1160 0 ) ( 0 1160 0 ) ( 0 1160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 0 1160 0 ) ( 0 1100 0 ) ( 0 1100 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 1100 0 ) ( 440 1160 0 ) ( 440 1160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 380 1100 0 ) ( 380 2280 0 ) ( 440 2280 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 2280 256 ) ( 380 2280 256 ) ( 380 1100 256 ) textures/common/caulk 0 0 0 1 1
+( 380 1100 0 ) ( 440 1100 0 ) ( 440 1100 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 2280 0 ) ( 380 2280 0 ) ( 380 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 380 2280 0 ) ( 380 1100 0 ) ( 380 1100 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 1100 0 ) ( 440 2280 0 ) ( 440 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 0 2220 0 ) ( 0 2280 0 ) ( 440 2280 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 2280 256 ) ( 0 2280 256 ) ( 0 2220 256 ) textures/common/caulk 0 0 0 1 1
+( 0 2220 0 ) ( 440 2220 0 ) ( 440 2220 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 2280 0 ) ( 0 2280 0 ) ( 0 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 0 2280 0 ) ( 0 2220 0 ) ( 0 2220 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 2220 0 ) ( 440 2280 0 ) ( 440 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 0 1440 0 ) ( 0 1500 0 ) ( 340 1500 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 340 1500 48 ) ( 0 1500 48 ) ( 0 1440 48 ) textures/common/caulk 0 0 0 1 1
+( 0 1440 0 ) ( 340 1440 0 ) ( 340 1440 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 340 1500 0 ) ( 0 1500 0 ) ( 0 1500 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 0 1500 0 ) ( 0 1440 0 ) ( 0 1440 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 340 1440 0 ) ( 340 1500 0 ) ( 340 1500 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 0 1820 0 ) ( 0 1880 0 ) ( 340 1880 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 340 1880 48 ) ( 0 1880 48 ) ( 0 1820 48 ) textures/common/caulk 0 0 0 1 1
+( 0 1820 0 ) ( 340 1820 0 ) ( 340 1820 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 340 1880 0 ) ( 0 1880 0 ) ( 0 1880 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 0 1880 0 ) ( 0 1820 0 ) ( 0 1820 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 340 1820 0 ) ( 340 1880 0 ) ( 340 1880 48 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 580 1980 0 ) ( 580 2280 0 ) ( 640 2280 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2280 256 ) ( 580 2280 256 ) ( 580 1980 256 ) textures/common/caulk 0 0 0 1 1
+( 580 1980 0 ) ( 640 1980 0 ) ( 640 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2280 0 ) ( 580 2280 0 ) ( 580 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 580 2280 0 ) ( 580 1980 0 ) ( 580 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 1980 0 ) ( 640 2280 0 ) ( 640 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 900 1980 0 ) ( 900 2280 0 ) ( 960 2280 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 2280 256 ) ( 900 2280 256 ) ( 900 1980 256 ) textures/common/caulk 0 0 0 1 1
+( 900 1980 0 ) ( 960 1980 0 ) ( 960 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 2280 0 ) ( 900 2280 0 ) ( 900 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 900 2280 0 ) ( 900 1980 0 ) ( 900 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 1980 0 ) ( 960 2280 0 ) ( 960 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 640 2220 0 ) ( 640 2280 0 ) ( 720 2280 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 720 2280 256 ) ( 640 2280 256 ) ( 640 2220 256 ) textures/common/caulk 0 0 0 1 1
+( 640 2220 0 ) ( 720 2220 0 ) ( 720 2220 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 720 2280 0 ) ( 640 2280 0 ) ( 640 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2280 0 ) ( 640 2220 0 ) ( 640 2220 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 720 2220 0 ) ( 720 2280 0 ) ( 720 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 820 2220 0 ) ( 820 2280 0 ) ( 960 2280 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 2280 256 ) ( 820 2280 256 ) ( 820 2220 256 ) textures/common/caulk 0 0 0 1 1
+( 820 2220 0 ) ( 960 2220 0 ) ( 960 2220 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 2280 0 ) ( 820 2280 0 ) ( 820 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 820 2280 0 ) ( 820 2220 0 ) ( 820 2220 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 2220 0 ) ( 960 2280 0 ) ( 960 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 720 2220 112 ) ( 720 2280 112 ) ( 820 2280 112 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 820 2280 256 ) ( 720 2280 256 ) ( 720 2220 256 ) textures/common/caulk 0 0 0 1 1
+( 720 2220 112 ) ( 820 2220 112 ) ( 820 2220 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 820 2280 112 ) ( 720 2280 112 ) ( 720 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 720 2280 112 ) ( 720 2220 112 ) ( 720 2220 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 820 2220 112 ) ( 820 2280 112 ) ( 820 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 640 1980 0 ) ( 640 2004 0 ) ( 680 2004 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2004 256 ) ( 640 2004 256 ) ( 640 1980 256 ) textures/common/caulk 0 0 0 1 1
+( 640 1980 0 ) ( 680 1980 0 ) ( 680 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2004 0 ) ( 640 2004 0 ) ( 640 2004 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2004 0 ) ( 640 1980 0 ) ( 640 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 1980 0 ) ( 680 2004 0 ) ( 680 2004 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 640 2040 0 ) ( 640 2064 0 ) ( 680 2064 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2064 256 ) ( 640 2064 256 ) ( 640 2040 256 ) textures/common/caulk 0 0 0 1 1
+( 640 2040 0 ) ( 680 2040 0 ) ( 680 2040 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2064 0 ) ( 640 2064 0 ) ( 640 2064 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2064 0 ) ( 640 2040 0 ) ( 640 2040 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2040 0 ) ( 680 2064 0 ) ( 680 2064 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 640 2100 0 ) ( 640 2124 0 ) ( 680 2124 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2124 256 ) ( 640 2124 256 ) ( 640 2100 256 ) textures/common/caulk 0 0 0 1 1
+( 640 2100 0 ) ( 680 2100 0 ) ( 680 2100 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2124 0 ) ( 640 2124 0 ) ( 640 2124 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2124 0 ) ( 640 2100 0 ) ( 640 2100 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2100 0 ) ( 680 2124 0 ) ( 680 2124 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 640 2160 0 ) ( 640 2184 0 ) ( 680 2184 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2184 256 ) ( 640 2184 256 ) ( 640 2160 256 ) textures/common/caulk 0 0 0 1 1
+( 640 2160 0 ) ( 680 2160 0 ) ( 680 2160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2184 0 ) ( 640 2184 0 ) ( 640 2184 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2184 0 ) ( 640 2160 0 ) ( 640 2160 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 680 2160 0 ) ( 680 2184 0 ) ( 680 2184 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 940 1980 0 ) ( 940 2040 0 ) ( 1140 2040 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 2040 256 ) ( 940 2040 256 ) ( 940 1980 256 ) textures/common/caulk 0 0 0 1 1
+( 940 1980 0 ) ( 1140 1980 0 ) ( 1140 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 2040 0 ) ( 940 2040 0 ) ( 940 2040 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 940 2040 0 ) ( 940 1980 0 ) ( 940 1980 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1140 1980 0 ) ( 1140 2040 0 ) ( 1140 2040 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 960 2100 0 ) ( 960 2160 0 ) ( 1020 2160 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1020 2160 40 ) ( 960 2160 40 ) ( 960 2100 40 ) textures/common/caulk 0 0 0 1 1
+( 960 2100 0 ) ( 1020 2100 0 ) ( 1020 2100 40 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1020 2160 0 ) ( 960 2160 0 ) ( 960 2160 40 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 2160 0 ) ( 960 2100 0 ) ( 960 2100 40 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1020 2100 0 ) ( 1020 2160 0 ) ( 1020 2160 40 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1080 2100 0 ) ( 1080 2160 0 ) ( 1120 2160 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1120 2160 40 ) ( 1080 2160 40 ) ( 1080 2100 40 ) textures/common/caulk 0 0 0 1 1
+( 1080 2100 0 ) ( 1120 2100 0 ) ( 1120 2100 40 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1120 2160 0 ) ( 1080 2160 0 ) ( 1080 2160 40 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 2160 0 ) ( 1080 2100 0 ) ( 1080 2100 40 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1120 2100 0 ) ( 1120 2160 0 ) ( 1120 2160 40 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 1040 2180 0 ) ( 1040 2220 0 ) ( 1080 2220 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 2220 180 ) ( 1040 2220 180 ) ( 1040 2180 180 ) textures/common/caulk 0 0 0 1 1
+( 1040 2180 0 ) ( 1080 2180 0 ) ( 1080 2180 180 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 2220 0 ) ( 1040 2220 0 ) ( 1040 2220 180 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1040 2220 0 ) ( 1040 2180 0 ) ( 1040 2180 180 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 1080 2180 0 ) ( 1080 2220 0 ) ( 1080 2220 180 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 580 2280 0 ) ( 580 2560 0 ) ( 640 2560 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2560 256 ) ( 580 2560 256 ) ( 580 2280 256 ) textures/common/caulk 0 0 0 1 1
+( 580 2280 0 ) ( 640 2280 0 ) ( 640 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2560 0 ) ( 580 2560 0 ) ( 580 2560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 580 2560 0 ) ( 580 2280 0 ) ( 580 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2280 0 ) ( 640 2560 0 ) ( 640 2560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 900 2280 0 ) ( 900 2560 0 ) ( 960 2560 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 2560 256 ) ( 900 2560 256 ) ( 900 2280 256 ) textures/common/caulk 0 0 0 1 1
+( 900 2280 0 ) ( 960 2280 0 ) ( 960 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 2560 0 ) ( 900 2560 0 ) ( 900 2560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 900 2560 0 ) ( 900 2280 0 ) ( 900 2280 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 960 2280 0 ) ( 960 2560 0 ) ( 960 2560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 640 2500 0 ) ( 640 2560 0 ) ( 900 2560 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 900 2560 256 ) ( 640 2560 256 ) ( 640 2500 256 ) textures/common/caulk 0 0 0 1 1
+( 640 2500 0 ) ( 900 2500 0 ) ( 900 2500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 900 2560 0 ) ( 640 2560 0 ) ( 640 2560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 640 2560 0 ) ( 640 2500 0 ) ( 640 2500 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 900 2500 0 ) ( 900 2560 0 ) ( 900 2560 256 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 660 2360 0 ) ( 660 2400 0 ) ( 900 2400 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 900 2400 64 ) ( 660 2400 64 ) ( 660 2360 64 ) textures/common/caulk 0 0 0 1 1
+( 660 2360 0 ) ( 900 2360 0 ) ( 900 2360 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 900 2400 0 ) ( 660 2400 0 ) ( 660 2400 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 660 2400 0 ) ( 660 2360 0 ) ( 660 2360 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 900 2360 0 ) ( 900 2400 0 ) ( 900 2400 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+{
+( 360 1620 0 ) ( 360 1700 0 ) ( 440 1700 0 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 1700 64 ) ( 360 1700 64 ) ( 360 1620 64 ) textures/common/caulk 0 0 0 1 1
+( 360 1620 0 ) ( 440 1620 0 ) ( 440 1620 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 1700 0 ) ( 360 1700 0 ) ( 360 1700 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 360 1700 0 ) ( 360 1620 0 ) ( 360 1620 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+( 440 1620 0 ) ( 440 1700 0 ) ( 440 1700 64 ) textures/mp_carentan/building_ext 0 0 0 1 1
+}
+
+}
+
+{
+"classname" "info_player_allies"
+"origin" "2000 2700 32"
+"angle" "270"
+}
+
+{
+"classname" "info_player_allies"
+"origin" "2060 2740 32"
+"angle" "270"
+}
+
+{
+"classname" "info_player_allies"
+"origin" "1920 2720 32"
+"angle" "225"
+}
+
+{
+"classname" "info_player_allies"
+"origin" "1960 2780 32"
+"angle" "270"
+}
+
+{
+"classname" "info_player_allies"
+"origin" "2020 2800 32"
+"angle" "270"
+}
+
+{
+"classname" "info_player_allies"
+"origin" "1900 2800 32"
+"angle" "225"
+}
+
+{
+"classname" "info_player_axis"
+"origin" "1020 300 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_axis"
+"origin" "1100 340 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_axis"
+"origin" "940 340 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_axis"
+"origin" "1060 420 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_axis"
+"origin" "1140 400 32"
+"angle" "45"
+}
+
+{
+"classname" "info_player_axis"
+"origin" "960 400 32"
+"angle" "315"
+}
+
+{
+"classname" "mp_searchanddestroy_bombzone_a"
+"origin" "1580 1260 32"
+}
+
+{
+"classname" "mp_searchanddestroy_bombzone_b"
+"origin" "760 1720 32"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1020 380 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1060 460 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1000 900 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1400 900 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1700 900 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1580 1260 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1200 1260 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "760 1720 32"
+"angle" "90"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1000 1500 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1260 1700 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1440 1870 32"
+"angle" "270"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1380 2190 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1560 2300 32"
+"angle" "270"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1960 2700 32"
+"angle" "270"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "1960 1800 32"
+"angle" "270"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "200 1600 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "200 1960 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "760 2100 32"
+"angle" "0"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "760 2420 32"
+"angle" "0"
+}
+
+{
+"classname" "light"
+"origin" "1060 380 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "1100 900 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "1580 1260 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "760 1720 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "1200 1700 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "1380 2190 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "1600 2340 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "1960 2720 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "1960 1800 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "200 1700 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "760 2100 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
+{
+"classname" "light"
+"origin" "1440 1700 200"
+"light" "250"
+"_color" "1 0.92 0.75"
+}
+
