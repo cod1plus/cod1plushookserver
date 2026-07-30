@@ -64,6 +64,12 @@ static const unsigned char LT_PROLOGUE[7] = { 0x55, 0x89, 0xe5, 0x53, 0x83, 0xec
 #define LT_PATCHLEN 7
 
 /* ---- gentity_t / gclient offsets ---- */
+/* MUST MATCH mss32/lean_fix.cpp body_shift_* and lean_hitbox.c LEAN_BODY_SHIFT_*. */
+#define PB_BODY_SHIFT_SCALE        1.0f
+#define PB_BODY_SHIFT_RIGHT_SCALE  3.0f
+
+#define E_MINS        0x104   /* r.mins vec3 (disasm-confirmed, see lean_hitbox.c) */
+#define E_MAXS        0x110   /* r.maxs vec3 */
 #define E_CLIENT      0x15c
 #define E_ORIGIN      0x138   /* r.currentOrigin vec3 */
 #define GENTITY_SIZE  0x31c
@@ -250,14 +256,35 @@ static const limbcap_t LIMB_CAPS[] = {
 
 /* FULL lean offset (the eye's). Per-bone scaling by height is done by
  * lean_at_height() - do not pre-scale it here. */
-static void compute_lean(void* cl, float out[3])
+static void compute_lean(void* ent, void* cl, float out[3])
 {
     out[0] = out[1] = out[2] = 0.0f;
     float leanf = *(float*)((char*)cl + PS_LEANF);
     if (leanf == 0.0f) return;
     float yaw = *(float*)((char*)cl + PS_VIEWYAW);
     float off[3] = { 0.0f, 0.0f, 0.0f };
-    p_AddLean(off, yaw, leanf, 16.0f, 20.0f);
+    p_AddLean(off, yaw, leanf, 16.0f, 20.0f);   /* the EYE's offset, ~20 units */
+
+    /* The drawn body goes FURTHER than the eye: the client's animation controller adds
+     * tag_origin_offset[1] on top (the helicopter fix, mss32/lean_fix.cpp). Without this
+     * term the bones land at ~20 while the model is at 25 to 32.5, and every head shot
+     * misses by 5 to 12 units - which is what happened when only the eye offset was
+     * used. KEEP IN STEP with lean_fix.cpp body_shift_* and lean_hitbox.c
+     * LEAN_BODY_SHIFT_*: all three describe the same displacement. */
+    float* mins = (float*)((char*)ent + E_MINS);
+    float* maxs = (float*)((char*)ent + E_MAXS);
+    const int is_crouch = (maxs[2] - mins[2]) < 55.0f;   /* stand ~70, crouch ~40 */
+    const int is_left   = (leanf < 0.0f);
+    float K = is_crouch ? (is_left ? 12.5f : 2.5f) : (is_left ? 5.0f : 2.5f);
+    if (!is_left) K *= PB_BODY_SHIFT_RIGHT_SCALE;
+    const float body_extra = K * fabsf(leanf) * PB_BODY_SHIFT_SCALE;
+
+    float mag = sqrtf(off[0]*off[0] + off[1]*off[1]);
+    if (mag > 0.01f) {
+        off[0] += (off[0] / mag) * body_extra;
+        off[1] += (off[1] / mag) * body_extra;
+    }
+
     out[0] = off[0] * g_lean_frac;
     out[1] = off[1] * g_lean_frac;
     out[2] = off[2] * g_lean_frac;
@@ -277,7 +304,7 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
 
     float* org = (float*)((char*)ent + E_ORIGIN);
     float  lean[3];
-    compute_lean(cl, lean);
+    compute_lean(ent, cl, lean);
 
     /* Height reference for the lean scaling: the topmost bone, i.e. the skull. Taken
      * from the posed skeleton so it follows the stance with no hardcoded eye height. */
