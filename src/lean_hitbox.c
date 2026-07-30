@@ -36,10 +36,17 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <math.h>
 
 #include "hooks.h"
 
 #define TAG "[lean_hitbox]"
+
+/* MUST MATCH mss32/lean_fix.cpp body_shift_lean_scale / body_shift_right_scale.
+ * The client draws the body this much further out than the engine lean; the box has to
+ * follow it or the leaning player is visible but unhittable. */
+#define LEAN_BODY_SHIFT_SCALE        1.0f
+#define LEAN_BODY_SHIFT_RIGHT_SCALE  3.0f
 
 #define GAME_SO_NAME           "game.mp.i386.so"
 
@@ -152,11 +159,34 @@ static void hook_ClientThink_real(void *ent, void *cmd)
     }
     g_saved[num] = 1;
 
+    /* The client draws the body FURTHER out than the engine lean. Its animation
+     * controller adds tag_origin_offset[1] on top (CoD2 vanilla behaviour, ported in
+     * mss32/lean_fix.cpp): the "helicopter" fix, without which a peeker shows an arm and
+     * nothing else. That extra offset has to be in the box too, or the model stands
+     * beside its own hitbox and cannot be shot - which is exactly what happened when the
+     * client-side shift was briefly removed instead of mirrored.
+     *
+     * Deterministic from leanf and stance, so both sides compute it independently and no
+     * network sync is needed. KEEP IN STEP WITH lean_fix.cpp's body_shift_* config. */
+    const float crouch_h = 55.0f;                 /* standing box ~70, crouched ~40 */
+    const int   is_crouch = (maxs[2] - mins[2]) < crouch_h;
+    const int   is_left   = (leanf < 0.0f);
+    float K = is_crouch ? (is_left ? 12.5f : 2.5f) : (is_left ? 5.0f : 2.5f);
+    if (!is_left) K *= LEAN_BODY_SHIFT_RIGHT_SCALE;
+    const float body_extra = K * fabsf(leanf) * LEAN_BODY_SHIFT_SCALE;
+
+    /* body_extra runs along the same lateral direction as the eye offset */
+    float mag = sqrtf(off[0] * off[0] + off[1] * off[1]);
+    float ux = 0.0f, uy = 0.0f;
+    if (mag > 0.01f) { ux = off[0] / mag; uy = off[1] / mag; }
+
+    float total[2] = { (off[0] + ux * body_extra) * g_lean_frac,
+                       (off[1] + uy * body_extra) * g_lean_frac };
+
     /* extend on the lean side only (x/y); the head does not change the box height */
     for (int i = 0; i < 2; i++) {
-        float d = off[i] * g_lean_frac;
-        if (d > 0.0f) maxs[i] += d;
-        else          mins[i] += d;
+        if (total[i] > 0.0f) maxs[i] += total[i];
+        else                 mins[i] += total[i];
     }
     p_trap_LinkEntity(ent);                             /* re-file widened box  */
 }
