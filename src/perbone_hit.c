@@ -30,7 +30,9 @@
  *         COD1RELOADED_PERBONE_HEADRAD (head sphere, default 6.0),
  *         COD1RELOADED_PERBONE_NECKRAD (neck sphere, default 5.0),
  *         COD1RELOADED_PERBONE_LEANFRAC (lean multiplier, default 1.0 - the
- *           per-bone height scaling shapes it; lowering this re-breaks headshots).
+ *           per-bone height scaling shapes it; lowering this re-breaks headshots),
+ *         COD1RELOADED_PERBONE_DEBUG=1 (log the real head miss distance per shot
+ *           on a leaning victim - use this instead of guessing at the geometry).
  */
 
 #define _GNU_SOURCE
@@ -131,6 +133,7 @@ static float g_cap_scale = 1.0f;  /* limb capsule radius multiplier */
 /* Global multiplier on the lean offset. 1.0 = the real offset; the per-bone
  * height scaling is what shapes it. Lowering this re-introduces the bug. */
 static float g_lean_frac = 1.0f;
+static int    g_debug    = 0;   /* COD1RELOADED_PERBONE_DEBUG=1 -> log the head miss distance */
 static int    g_in_trace = 0;
 static time_t g_last_dump = 0;   /* dump-mode throttle: re-dump the pose 1/2s */
 
@@ -350,9 +353,33 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
                                Hp[1]+up[1]*g_head_len,
                                Hp[2]+up[2]*g_head_len };
             float t, cp[3];
-            if (seg_seg_dist2(start, end, Hp, crown, &t, cp) <= g_head_rad*g_head_rad) {
+            float d2 = seg_seg_dist2(start, end, Hp, crown, &t, cp);
+            if (d2 <= g_head_rad*g_head_rad) {
                 best_hl = HL_HEAD;
                 hit_pos[0]=cp[0]; hit_pos[1]=cp[1]; hit_pos[2]=cp[2];
+            }
+
+            /* Diagnostic for the "cannot hit a leaning head" report. Three fixes reasoned
+             * from a model of the geometry did not move it, so log the real numbers: how
+             * far the bullet actually passed from the skull axis, where the head was
+             * placed, and what the shot was classified as.
+             * COD1RELOADED_PERBONE_DEBUG=1, one line per second, leaning victims only. */
+            if (g_debug) {
+                float leanf = *(float*)((char*)cl + PS_LEANF);
+                if (leanf != 0.0f) {
+                    static time_t last_dbg = 0;
+                    time_t now = time(NULL);
+                    if (now != last_dbg) {
+                        last_dbg = now;
+                        printf("%s DBG leanf=%.2f leanoff=(%.1f %.1f) ref_z=%.1f "
+                               "head=(%.1f %.1f %.1f) org=(%.1f %.1f %.1f) "
+                               "miss=%.1f rad=%.1f -> hitloc=%d\n",
+                               TAG, leanf, lean[0], lean[1], ref_z,
+                               Hp[0], Hp[1], Hp[2], org[0], org[1], org[2],
+                               sqrtf(d2), g_head_rad, best_hl);
+                        fflush(stdout);
+                    }
+                }
             }
         }
     }
@@ -530,6 +557,8 @@ void perbone_hit_init(void)
     if (hl && *hl) { float v = (float)atof(hl); if (v > 0.0f && v <= 30.0f) g_head_len = v; }
     const char* lf = getenv("COD1RELOADED_PERBONE_LEANFRAC");
     if (lf && *lf) { float v = (float)atof(lf); if (v >= 0.0f && v <= 2.0f) g_lean_frac = v; }
+    const char* dbg = getenv("COD1RELOADED_PERBONE_DEBUG");
+    if (dbg && *dbg && *dbg != '0') g_debug = 1;
     const char* ls = getenv("COD1RELOADED_PERBONE_LIMBSCALE");
     if (ls && *ls) { float v = (float)atof(ls); if (v > 0.0f && v <= 4.0f) g_cap_scale = v; }
 
