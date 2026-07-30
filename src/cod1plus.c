@@ -26,6 +26,13 @@
 
 #include "cod1_defs.h"
 #include "hooks.h"
+#include "cod1reloaded.h"
+#include "lean_hitbox.h"
+#include "perbone_hit.h"
+#include "antilag.h"
+#include "anim_clamp.h"
+#include "competitive_sv.h"
+#include "cheat_gate.h"
 
 #define COD1PLUS_TAG    "[cod1plus]"
 #define CFG_PATH        "./matchdata.cfg"
@@ -118,6 +125,7 @@ static int            g_current_score_limit = 13;
 static int            g_sv_maxclients = MAX_CLIENTS;
 static int            http_post(const char *url, const char *json);
 static void           parse_cmdline_fs_homepath(char *out, size_t sz);
+static void           parse_cmdline_fs_game(char *out, size_t sz);
 
 /* ------------------------------------------------------------------ */
 /* Config parser — handles: set KEY "VALUE"  or  set KEY VALUE         */
@@ -229,7 +237,15 @@ static int cfg_load(match_config_t *c, const char *path) {
     char fs_homepath[256] = {0};
     parse_cmdline_fs_homepath(fs_homepath, sizeof(fs_homepath));
     if (fs_homepath[0]) {
-        snprintf(c->logfile, sizeof(c->logfile), "%s/main/games_mp.log", fs_homepath);
+        /* When a mod is loaded (fs_game set), CoD1 writes the g_log into the MOD dir,
+         * not main/ — that's where PAM's [STATS_EVENT] lands. Verified in-tree:
+         * __rPAMv115b5/games_mp.log = 532 events vs main/games_mp.log = 15. Fall back
+         * to main/ only for a vanilla (no fs_game) server. Override any time via the
+         * cod1plus_logfile key in matchdata.cfg. */
+        char fs_game[128] = {0};
+        parse_cmdline_fs_game(fs_game, sizeof(fs_game));
+        const char *logdir = fs_game[0] ? fs_game : "main";
+        snprintf(c->logfile, sizeof(c->logfile), "%s/%s/games_mp.log", fs_homepath, logdir);
     } else {
         /* CoD1 defaults to $HOME/.callofduty when fs_homepath not set on cmdline */
         const char *home = getenv("HOME");
@@ -554,6 +570,32 @@ static void parse_cmdline_fs_homepath(char *out, size_t sz) {
     }
 }
 
+/* Mirror of parse_cmdline_fs_homepath, for the mod dir. CoD1 writes the g_log
+ * (games_mp.log, where PAM prints [STATS_EVENT]) into fs_homepath/<fs_game>/ when a
+ * mod is loaded, NOT main/. */
+static void parse_cmdline_fs_game(char *out, size_t sz) {
+    FILE *f = fopen("/proc/self/cmdline", "r");
+    if (!f) return;
+    char cmdline[4096] = {0};
+    size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, f);
+    fclose(f);
+    size_t i = 0;
+    while (i < n) {
+        const char *arg = &cmdline[i];
+        size_t len = strlen(arg);
+        if (len == 0) { i++; continue; }
+        if (strcasecmp(arg, "fs_game") == 0) {
+            size_t val = i + len + 1;
+            if (val < n && cmdline[val]) {
+                strncpy(out, &cmdline[val], sz - 1);
+                out[sz - 1] = 0;
+                return;
+            }
+        }
+        i += len + 1;
+    }
+}
+
 static int parse_cmdline_maxclients(void) {
     FILE *f = fopen("/proc/self/cmdline", "r");
     if (!f) return MAX_CLIENTS;
@@ -734,6 +776,15 @@ static void collect_client_uuids(void) {
         if (!userinfo || userinfo[0] != '\\') {
             continue;
         }
+        /* cvar cheat check (PB replacement): read the client's self-reported verdict.
+         * Observe-only by default; see cheat_gate.c. Runs before the login/uuid path so
+         * it also covers clients that never send a login key. */
+        if (cheat_gate_enabled()) {
+            char ac[16], acname[64];
+            if (!userinfo_get_safe(userinfo, 1024, "cod1x_ac", ac, sizeof(ac))) ac[0] = 0;
+            if (!userinfo_get_safe(userinfo, 1024, "name", acname, sizeof(acname))) acname[0] = 0;
+            cheat_gate_check(i, acname, ac);
+        }
         if (!userinfo_get_safe(userinfo, 1024, "login", uuid, sizeof(uuid))) {
             continue;
         }
@@ -770,6 +821,10 @@ static void collect_client_uuids(void) {
 }
 
 static void SV_DirectConnect_Hook(netadr_t from) {
+    /* cod1reloaded version gate: reject outdated clients at connect time
+     * (before a slot is allocated). 0 = rejected, error already sent. */
+    if (!cod1reloaded_allow_connect(from))
+        return;
     if (g_sv_directconnect_trampoline) {
         g_sv_directconnect_trampoline(from);
     }
@@ -1052,7 +1107,7 @@ static int http_post_https(const char *url, const char *json) {
     if (!url || !json) return -1;
     char cmd[1024];
     snprintf(cmd, sizeof(cmd),
-             "curl -fsS -X POST -H \"Content-Type: application/json\" --data-binary @- \"%s\" > /dev/null",
+             "LD_PRELOAD= curl -fsS -X POST -H \"Content-Type: application/json\" --data-binary @- \"%s\" 2>&1",
              url);
     FILE *fp = popen(cmd, "w");
     if (!fp) return -1;
@@ -1121,7 +1176,7 @@ static int http_get_url(const char *url, char *resp, size_t resp_sz) {
     if (!url || !resp || resp_sz == 0) return -1;
     if (strncmp(url, "https://", 8) == 0) {
         char cmd[1024];
-        snprintf(cmd, sizeof(cmd), "curl -fsL \"%s\"", url);
+        snprintf(cmd, sizeof(cmd), "LD_PRELOAD= curl -fsL \"%s\"", url);
         FILE *fp = popen(cmd, "r");
         if (!fp) return -1;
         size_t total = 0;
@@ -1301,6 +1356,37 @@ static void *log_tailer_thread(void *arg) {
 
 static void __attribute__((constructor)) init(void) {
     printf("%s Loaded (v2 — S&D SoloQ)\n", COD1PLUS_TAG);
+
+    /* cod1reloaded server-side: protocol -> 10, master repoint, version gate.
+     * Runs in the .so constructor, before the engine main()/SV_Init. */
+    cod1reloaded_apply_patches();
+
+    /* read-only: if COD1RELOADED_TICKDIAG=1, log level.time/svs.time rate per second */
+    cod1reloaded_start_tickdiag();
+
+    /* cod1reloaded server-side: make the bullet hitbox follow the lean (anti
+     * "clip"/corner-peek). Spawns a watcher that hooks game.mp.i386.so once it
+     * is loaded and re-installs on map change. COD1RELOADED_LEAN_HITBOX=0 off. */
+    lean_hitbox_init();
+
+    /* cod1reloaded: per-bone bullet hit refinement (fine phase on top of the
+     * box shift). Off unless COD1RELOADED_PERBONE_HIT is set (dump | on). */
+    perbone_hit_init();
+
+    /* cod1reloaded: server-side lag compensation. CoD1 has NO native antilag;
+     * this implements it and reads the (previously dead) g_antilag cvar so
+     * `rcon g_antilag 1` toggles it live. Off unless COD1RELOADED_ANTILAG=1. */
+    antilag_init();
+
+    /* stop "Player animation index out of range" drops: clamp instead of Com_Error */
+    anim_clamp_init();
+
+    /* publish g_competitive as SYSTEMINFO so modded clients lock their fair-play
+     * cvars (the cod2x model). Inert until the cfg sets g_competitive 1. */
+    competitive_sv_init();
+
+    /* cvar cheat check (PB replacement part 2). Observe-only by default. */
+    cheat_gate_init();
 
     const char *mode = getenv("COD1PLUS_MODE");
     int live_mode = (!mode || strcasecmp(mode, "live") == 0);

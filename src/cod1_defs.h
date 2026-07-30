@@ -481,6 +481,8 @@ typedef struct {
 } serverStatic_t;
 
 #define ADDR_SVS                    0x083CCD84
+/* NOTE: the real svs.clients pointer is at ADDR_SVS+0x0C = 0x083CCD90 (deref it,
+ * e.g. svs->clients). 0x083CCDF0 below is STALE — it is the svs.challenges array. */
 #define ADDR_SVS_CLIENTS            0x083CCDF0
 #define ADDR_SVS_TIME               0x083CCD88
 
@@ -499,7 +501,14 @@ typedef struct {
 #define ADDR_SV_SENDSERVERCOMMAND   0x0808B900
 #define ADDR_SV_GENTITYNUM          0x08089258
 #define ADDR_SV_GAMECLIENTNUM       0x08089270
-#define ADDR_SV_DROPCLIENT          0x08085CF4
+/* CORRECTED 2026-06-29: 0x08085CF4 was a char-class helper (zero xrefs). The real
+ * SV_DropClient(client_t *drop, const char *reason) is at 0x0808AC11 (verified via
+ * "Going to CS_ZOMBIE for %s" xref + 18 call sites). */
+#define ADDR_SV_DROPCLIENT          0x0808AC11
+/* Engine helpers used by cod1reloaded.c (RE'd 2026-06-29): */
+#define ADDR_CMD_ARGV               0x080600F4  /* char* Cmd_Argv(int) */
+#define ADDR_INFO_VALUEFORKEY       0x08086397  /* char* Info_ValueForKey(info,key) */
+#define ADDR_NET_OUTOFBANDPRINT     0x0808428E  /* void(int netsrc, netadr_t, fmt, ...) */
 #define ADDR_SV_FRAME               0x0808CDF8
 #define ADDR_SV_SHUTDOWNGAMEMODULE  0x0808AD8C
 #define ADDR_SV_SPAWNSERVER         0x0808A220
