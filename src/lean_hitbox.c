@@ -14,13 +14,19 @@
  *   - ClientThink_real sets r.currentOrigin = ps.origin (un-leaned) and links;
  *     the lean (G_AddLean/AddLeanToPosition, ~20u right) is applied only to the
  *     eye/muzzle/damage points, never to the box -> leaning body is off its box.
- *   - We run after ClientThink_real, add the SAME AddLeanToPosition offset to
- *     r.currentOrigin, and re-link so absmin/absmax (broadphase) and the fine
- *     trace both use the leaned position. The box now follows the visible lean.
+ *   - We run after ClientThink_real and WIDEN r.mins/r.maxs on the lean side by the
+ *     full AddLeanToPosition offset, then re-link so absmin/absmax (broadphase) and
+ *     the fine trace both cover the leaned body.
  *
- * Render safety: es.pos.trBase is built from ps.origin (BG_PlayerStateToEntity-
- * State), not r.currentOrigin, so moving currentOrigin moves ONLY the collision
- * hull; the rendered model (which leans client-side from es.leanf) is unchanged.
+ *   Earlier revisions TRANSLATED the box by a fraction of the lean instead. That
+ *   cannot work: the body pivots about the feet, so feet and head need different
+ *   offsets, and any single translation leaves one of them outside the box - in
+ *   practice the head, giving "standing + lean right and you cannot be shot in the
+ *   head". The swept volume is the only correct answer for one AABB.
+ *
+ * Render safety: r.mins/r.maxs are collision-only. The rendered model leans
+ * client-side from es.leanf and is untouched, and r.currentOrigin is left alone, so
+ * movement, prediction and the visible player are all unaffected.
  */
 
 #define _GNU_SOURCE
@@ -46,7 +52,13 @@
  * clean instruction boundary -> a safe 5-byte detour cut point). */
 static const unsigned char CT_PROLOGUE[5] = { 0x55, 0x89, 0xe5, 0x56, 0x53 };
 
-/* gentity_t offsets */
+/* gentity_t offsets. mins/maxs confirmed by disassembly of this exact binary: the
+ * module writes 3-float groups at 0x104/0x108/0x10c and 0x110/0x114/0x118, immediately
+ * before contents (0x11c), absmin (0x120), absmax (0x12c) and currentOrigin (0x138) -
+ * the standard entityShared_t order, anchored by the already-known 0x138. */
+#define E_NUMBER    0x00    /* gentity->s.number (entityState_t starts with it) */
+#define E_MINS      0x104   /* gentity->r.mins   (vec3)              */
+#define E_MAXS      0x110   /* gentity->r.maxs   (vec3)              */
 #define E_CLIENT    0x15c   /* gentity->client (gclient*)            */
 #define E_ORIGIN    0x138   /* gentity->r.currentOrigin  (vec3)      */
 
@@ -69,36 +81,84 @@ static trap_LinkEntity_t   p_trap_LinkEntity     = NULL;
 static AddLeanToPosition_t p_AddLeanToPosition   = NULL;
 static uintptr_t           g_game_base           = 0;
 
-/* Fraction of the eye's lean offset applied to the hitbox. The visible model
- * leans as a tilt (head ~full, feet ~0), and the box is wide, so ~0.5 best
- * centres the box over the tilted body. 1.0 = full eye offset (over-extends).
- * Tunable: COD1RELOADED_LEAN_HITBOX_FRAC. */
-static float               g_lean_frac           = 0.5f;
+/* Fraction of the head's lean offset the box is widened by.
+ * 1.0 = cover it fully. Anything less leaves the head outside the box, which is the
+ * bug this module exists to fix, so only lower it if the widened box turns out too
+ * generous in play. Tunable: COD1RELOADED_LEAN_HITBOX_FRAC. */
+static float               g_lean_frac           = 1.0f;
 
-/* The hook: after the engine finished the think (currentOrigin = ps.origin and
- * the entity is linked), shift the collision box by the lean and re-link. */
+/* Saved un-leaned box per entity, so widening never accumulates frame over frame. */
+#define LH_MAX_ENT 64
+static float g_saved_mins[LH_MAX_ENT][3];
+static float g_saved_maxs[LH_MAX_ENT][3];
+static int   g_saved[LH_MAX_ENT];
+
+/* The hook: after the engine finished the think (currentOrigin = ps.origin and the
+ * entity is linked), make the collision box cover the leaned body and re-link.
+ *
+ * WIDEN, DO NOT TRANSLATE. The body pivots about the feet: the feet stay on the
+ * origin while the head swings ~20 units to the side. Translating the whole box by a
+ * fraction of that (this module used 0.5) centres it on neither - it leaves the feet
+ * over-shifted AND the head hanging outside the box, which is exactly the reported
+ * "standing + lean right, cannot be shot in the head". A single AABB cannot follow a
+ * tilted body, so the honest answer is the swept volume: keep the box where it is and
+ * extend it on the lean side by the full head offset. Feet and head both stay
+ * hittable. The cost is a little over-coverage on the lean side, bounded by the lean
+ * distance, which is the right way round for a competitive server.
+ */
 static void hook_ClientThink_real(void *ent, void *cmd)
 {
+    char *cl0 = *(char **)((char *)ent + E_CLIENT);
+    int   num = *(int *)((char *)ent + E_NUMBER);
+
+    /* Undo last frame's widening before the engine thinks, so nothing accumulates
+     * even if the engine does not rewrite the box every frame. */
+    if (cl0 && num >= 0 && num < LH_MAX_ENT && g_saved[num]) {
+        float *mins = (float *)((char *)ent + E_MINS);
+        float *maxs = (float *)((char *)ent + E_MAXS);
+        for (int i = 0; i < 3; i++) {
+            mins[i] = g_saved_mins[num][i];
+            maxs[i] = g_saved_maxs[num][i];
+        }
+        g_saved[num] = 0;
+    }
+
     orig_ClientThink_real(ent, cmd);                    /* full think + link    */
 
     char *cl = *(char **)((char *)ent + E_CLIENT);      /* gentity->client      */
     if (!cl) return;                                    /* players only         */
+    if (num < 0 || num >= LH_MAX_ENT) return;
 
     float leanf = *(float *)(cl + PS_LEANF);
     if (leanf == 0.0f) return;                          /* not leaning: no-op   */
 
-    float  yaw = *(float *)(cl + PS_VIEWYAW);
-    float *org = (float *)((char *)ent + E_ORIGIN);     /* r.currentOrigin      */
+    float *mins = (float *)((char *)ent + E_MINS);
+    float *maxs = (float *)((char *)ent + E_MAXS);
 
-    /* Compute the FULL eye lean offset (into a zero vec), then apply g_lean_frac
-     * of it. A fraction (~0.5) best centres the wide box over the tilted body
-     * instead of over-shifting it past the head. */
+    /* Fail-safe: if these are not a player box, the offsets are wrong for this
+     * binary - do nothing rather than corrupt the entity. */
+    if (!(mins[0] > -48.0f && mins[0] < -4.0f &&
+          maxs[0] >   4.0f && maxs[0] <  48.0f &&
+          maxs[2] >  16.0f && maxs[2] < 128.0f))
+        return;
+
+    float  yaw = *(float *)(cl + PS_VIEWYAW);
     float off[3] = { 0.0f, 0.0f, 0.0f };
-    p_AddLeanToPosition(off, yaw, leanf, 16.0f, 20.0f); /* off = full eye offset */
-    org[0] += off[0] * g_lean_frac;
-    org[1] += off[1] * g_lean_frac;
-    org[2] += off[2] * g_lean_frac;
-    p_trap_LinkEntity(ent);                             /* re-file leaned box   */
+    p_AddLeanToPosition(off, yaw, leanf, 16.0f, 20.0f); /* off = full head offset */
+
+    for (int i = 0; i < 3; i++) {
+        g_saved_mins[num][i] = mins[i];
+        g_saved_maxs[num][i] = maxs[i];
+    }
+    g_saved[num] = 1;
+
+    /* extend on the lean side only (x/y); the head does not change the box height */
+    for (int i = 0; i < 2; i++) {
+        float d = off[i] * g_lean_frac;
+        if (d > 0.0f) maxs[i] += d;
+        else          mins[i] += d;
+    }
+    p_trap_LinkEntity(ent);                             /* re-file widened box  */
 }
 
 /* Lowest mapping of game.mp.i386.so == its load base (first PT_LOAD, vaddr 0). */
