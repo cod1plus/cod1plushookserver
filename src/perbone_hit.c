@@ -6,8 +6,9 @@
  *     position so the engine box-trace REGISTERS a hit on a peeking player.
  *   - this module hooks trap_LocationalTrace; when the engine reports a player
  *     box-hit, it poses the victim's skeleton, reads every bone's WORLD position
- *     (index-based, no names), shifts them by the SAME lean offset (CoD1's pose
- *     has no lean), and tests the bullet segment against a sphere on each bone.
+ *     (index-based, no names), shifts each by the lean SCALED BY ITS HEIGHT (the body
+ *     pivots about the feet, so the skull gets the full ~20u and the feet none), and
+ *     tests the bullet segment against a sphere on each bone.
  *     Any bone within the sphere radius -> body hit (hitloc by bone height);
  *     no bone -> neutralize to a world miss (the box over-hang becomes a miss).
  *
@@ -28,7 +29,8 @@
  * Tuning: COD1RELOADED_PERBONE_RADIUS (body sphere, default 6.0),
  *         COD1RELOADED_PERBONE_HEADRAD (head sphere, default 6.0),
  *         COD1RELOADED_PERBONE_NECKRAD (neck sphere, default 5.0),
- *         COD1RELOADED_PERBONE_LEANFRAC (bone lean shift, default 0.5).
+ *         COD1RELOADED_PERBONE_LEANFRAC (lean multiplier, default 1.0 - the
+ *           per-bone height scaling shapes it; lowering this re-breaks headshots).
  */
 
 #define _GNU_SOURCE
@@ -126,7 +128,9 @@ static float g_head_rad  = 4.5f;  /* head capsule radius (skull half-width) */
 static float g_head_len  = 8.0f;  /* head capsule length, from the head bone up the skull */
 static float g_neck_rad  = 3.0f;  /* neck sphere radius (the neck is thin) */
 static float g_cap_scale = 1.0f;  /* limb capsule radius multiplier */
-static float g_lean_frac = 0.5f;
+/* Global multiplier on the lean offset. 1.0 = the real offset; the per-bone
+ * height scaling is what shapes it. Lowering this re-introduces the bug. */
+static float g_lean_frac = 1.0f;
 static int    g_in_trace = 0;
 static time_t g_last_dump = 0;   /* dump-mode throttle: re-dump the pose 1/2s */
 
@@ -186,14 +190,41 @@ static float seg_seg_dist2(const float* p1, const float* q1,
     return dot3(dv, dv);
 }
 
-/* World position of a named bone (out[12..14]) + lean. 0 if the name is absent. */
-static int bone_world_by_name(void* ent, const char* name, const float lean[3], float p[3])
+/* Scale the lean offset by how high the bone sits.
+ *
+ * THE BODY PIVOTS ABOUT THE FEET: the head swings the full ~20 units sideways, the
+ * pelvis about half, the feet not at all. Adding one uniform offset to every bone (what
+ * this used to do) cannot be right for any of them, and with the old 0.5 factor the head
+ * sphere sat 10 units out while the real head was at 20 - so a bullet aimed at the head
+ * you can see missed the sphere and no headshot registered. That is the reported "can't
+ * shoot the head when he leans".
+ *
+ * ref_z is the topmost bone (the skull), so the head always receives exactly the full
+ * offset and the scale adapts by itself to standing, crouched and prone. That matters:
+ * G_AddLean's 20-unit lateral constant does NOT vary with stance (verified in the
+ * disassembly), only the eye height does, so normalising by a fixed eye height would
+ * under-shift a crouched head. */
+static void lean_at_height(const float lean[3], float local_z, float ref_z, float out[3])
+{
+    float f = (ref_z > 1.0f) ? (local_z / ref_z) : 1.0f;
+    if (f < 0.0f) f = 0.0f;
+    if (f > 1.0f) f = 1.0f;
+    out[0] = lean[0] * f;
+    out[1] = lean[1] * f;
+    out[2] = lean[2] * f;
+}
+
+/* World position of a named bone (out[12..14]) + height-scaled lean. 0 if absent. */
+static int bone_world_by_name(void* ent, const char* name, const float lean[3],
+                              float org_z, float ref_z, float p[3])
 {
     float m[16];
     if (!p_WorldTag(ent, name, m)) return 0;
-    p[0] = m[12] + lean[0];
-    p[1] = m[13] + lean[1];
-    p[2] = m[14] + lean[2];
+    float sc[3];
+    lean_at_height(lean, m[14] - org_z, ref_z, sc);   /* m is world -> local height */
+    p[0] = m[12] + sc[0];
+    p[1] = m[13] + sc[1];
+    p[2] = m[14] + sc[2];
     return 1;
 }
 
@@ -214,7 +245,8 @@ static const limbcap_t LIMB_CAPS[] = {
 };
 #define NUM_LIMB_CAPS ((int)(sizeof(LIMB_CAPS)/sizeof(LIMB_CAPS[0])))
 
-/* Lean offset to add to bone positions (same math the eye uses, * g_lean_frac). */
+/* FULL lean offset (the eye's). Per-bone scaling by height is done by
+ * lean_at_height() - do not pre-scale it here. */
 static void compute_lean(void* cl, float out[3])
 {
     out[0] = out[1] = out[2] = 0.0f;
@@ -244,15 +276,25 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
     float  lean[3];
     compute_lean(cl, lean);
 
+    /* Height reference for the lean scaling: the topmost bone, i.e. the skull. Taken
+     * from the posed skeleton so it follows the stance with no hardcoded eye height. */
+    float ref_z = 0.0f;
+    for (int i = 0; i < n; ++i) {
+        float z = arr[(long)i * 16 + 14];
+        if (z > ref_z) ref_z = z;
+    }
+
     int   best_hl = HL_NONE;
     float best_t  = 2.0f;
 
     /* BODY + LIMBS first; HEAD + NECK are tested LAST and WIN (see end of fn). */
     for (int i = 0; i < n; ++i) {
         const float* m = arr + (long)i * 16;          /* 0x40 = 16 floats */
-        float w[3] = { m[12] + org[0] + lean[0],
-                       m[13] + org[1] + lean[1],
-                       m[14] + org[2] + lean[2] };
+        float sc[3];
+        lean_at_height(lean, m[14], ref_z, sc);       /* m[14] already local */
+        float w[3] = { m[12] + org[0] + sc[0],
+                       m[13] + org[1] + sc[1],
+                       m[14] + org[2] + sc[2] };
         int   hl  = hitloc_for_z(m[14]);              /* body zone only (never head/neck) */
         float t;
         if (pt_seg_dist2(w, start, end, &t) <= g_radius*g_radius && t < best_t) {
@@ -265,8 +307,8 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
     /* limb capsules (continuous coverage on thin arms/legs where spheres gap) */
     for (int i = 0; i < NUM_LIMB_CAPS; ++i) {
         float A[3], B[3];
-        if (!bone_world_by_name(ent, LIMB_CAPS[i].a, lean, A)) continue;
-        if (!bone_world_by_name(ent, LIMB_CAPS[i].b, lean, B)) continue;
+        if (!bone_world_by_name(ent, LIMB_CAPS[i].a, lean, org[2], ref_z, A)) continue;
+        if (!bone_world_by_name(ent, LIMB_CAPS[i].b, lean, org[2], ref_z, B)) continue;
         float rr = LIMB_CAPS[i].radius * g_cap_scale;
         float t, cp[3];
         if (seg_seg_dist2(start, end, A, B, &t, cp) <= rr*rr && t < best_t) {
@@ -287,7 +329,7 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
      * (a chest shot's ray points away from the head), so head/neck win outright. */
     {
         float Np[3];
-        const int have_neck = bone_world_by_name(ent, "Bip01 Neck", lean, Np);
+        const int have_neck = bone_world_by_name(ent, "Bip01 Neck", lean, org[2], ref_z, Np);
         if (have_neck) {
             float t;
             if (pt_seg_dist2(Np, start, end, &t) <= g_neck_rad*g_neck_rad) {
@@ -296,7 +338,7 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
             }
         }
         float Hp[3];
-        if (bone_world_by_name(ent, "Bip01 Head", lean, Hp)) {
+        if (bone_world_by_name(ent, "Bip01 Head", lean, org[2], ref_z, Hp)) {
             float up[3] = { 0.0f, 0.0f, 1.0f };          /* fallback: world up */
             if (have_neck) {
                 up[0]=Hp[0]-Np[0]; up[1]=Hp[1]-Np[1]; up[2]=Hp[2]-Np[2];
