@@ -534,91 +534,96 @@ static void strip_quotes(char *s) {
     if (start) memmove(s, s + start, len - start + 1);
 }
 
-/* +match create {id} — parse match ID from /proc/self/cmdline         */
+/* ------------------------------------------------------------------ */
+/* Command-line reader                                                 */
+/*                                                                     */
+/* /proc/self/cmdline is NUL-separated, but WHAT lands in each slot     */
+/* depends on how the server was launched:                             */
+/*                                                                     */
+/*   shell   (./start.sh 99999)  -> one argv entry per token:           */
+/*                "+match" "create" "99999"                             */
+/*   manager (FPS orchestrator)  -> the WHOLE game command line in a    */
+/*                SINGLE argv entry, quotes included:                   */
+/*                "+set fs_game __rPAMv115b5 ... +match create \"315326\" ..." */
+/*                                                                     */
+/* Matching argv slots therefore found nothing on the FPS machines -    */
+/* "No match config - log tailer idle", no stats, and the stats log     */
+/* path never resolved either. Flatten NULs to spaces and tokenize the  */
+/* result ourselves (honouring quotes), which handles both layouts.     */
 /* ------------------------------------------------------------------ */
 
-static int parse_cmdline_match_id(char *out, size_t sz) {
+#define CMDLINE_MAX_TOKENS 128
+#define CMDLINE_TOKEN_LEN  256
+
+static int cmdline_tokens(char tok[CMDLINE_MAX_TOKENS][CMDLINE_TOKEN_LEN]) {
     FILE *f = fopen("/proc/self/cmdline", "r");
-    if (!f) return -1;
-
-    char cmdline[4096] = {0};
-    size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, f);
+    if (!f) return 0;
+    char raw[8192];
+    size_t n = fread(raw, 1, sizeof(raw) - 1, f);
     fclose(f);
+    if (n == 0) return 0;
+    raw[n] = 0;
+    for (size_t i = 0; i < n; i++) if (raw[i] == 0) raw[i] = 0x20;  /* NUL -> space */
 
-    /* cmdline is NUL-separated: arg0\0arg1\0arg2\0...
-     * Looking for: +match\0create\0{id}\0 */
+    int count = 0;
     size_t i = 0;
-    while (i < n) {
-        const char *arg = &cmdline[i];
-        size_t len = strlen(arg);
-        if (len == 0) { i++; continue; }
-
-        if (strcasecmp(arg, "+match") == 0) {
-            size_t next = i + len + 1;
-            if (next < n && strcasecmp(&cmdline[next], "create") == 0) {
-                size_t id_start = next + strlen(&cmdline[next]) + 1;
-                if (id_start < n && cmdline[id_start]) {
-                    strncpy(out, &cmdline[id_start], sz - 1);
-                    out[sz - 1] = 0;
-                    strip_quotes(out);
-                    return (out[0] != 0) ? 0 : -1;
-                }
-            }
+    while (i < n && count < CMDLINE_MAX_TOKENS) {
+        while (i < n && raw[i] == 0x20) i++;
+        if (i >= n) break;
+        size_t len = 0;
+        if (raw[i] == 0x22) {                       /* quoted value */
+            i++;
+            while (i < n && raw[i] != 0x22 && len + 1 < CMDLINE_TOKEN_LEN)
+                tok[count][len++] = raw[i++];
+            if (i < n && raw[i] == 0x22) i++;
+        } else {
+            while (i < n && raw[i] != 0x20 && len + 1 < CMDLINE_TOKEN_LEN)
+                tok[count][len++] = raw[i++];
         }
-        i += len + 1;
+        tok[count][len] = 0;
+        strip_quotes(tok[count]);
+        if (tok[count][0]) count++;
+    }
+    return count;
+}
+
+/* Value that follows `key` on the command line ("fs_homepath" -> its path). */
+static int cmdline_value_after(const char *key, char *out, size_t sz) {
+    static char tok[CMDLINE_MAX_TOKENS][CMDLINE_TOKEN_LEN];
+    const int n = cmdline_tokens(tok);
+    for (int i = 0; i + 1 < n; i++) {
+        if (strcasecmp(tok[i], key) == 0 && tok[i+1][0]) {
+            strncpy(out, tok[i+1], sz - 1);
+            out[sz - 1] = 0;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+/* +match create {id} */
+static int parse_cmdline_match_id(char *out, size_t sz) {
+    static char tok[CMDLINE_MAX_TOKENS][CMDLINE_TOKEN_LEN];
+    const int n = cmdline_tokens(tok);
+    for (int i = 0; i + 2 < n; i++) {
+        if (strcasecmp(tok[i], "+match") == 0 &&
+            strcasecmp(tok[i+1], "create") == 0 && tok[i+2][0]) {
+            strncpy(out, tok[i+2], sz - 1);
+            out[sz - 1] = 0;
+            return (out[0] != 0) ? 0 : -1;
+        }
     }
     return -1;
 }
 
 static void parse_cmdline_fs_homepath(char *out, size_t sz) {
-    FILE *f = fopen("/proc/self/cmdline", "r");
-    if (!f) return;
-    char cmdline[4096] = {0};
-    size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, f);
-    fclose(f);
-    size_t i = 0;
-    while (i < n) {
-        const char *arg = &cmdline[i];
-        size_t len = strlen(arg);
-        if (len == 0) { i++; continue; }
-        if (strcasecmp(arg, "fs_homepath") == 0) {
-            size_t val = i + len + 1;
-            if (val < n && cmdline[val]) {
-                strncpy(out, &cmdline[val], sz - 1);
-                out[sz - 1] = 0;
-                strip_quotes(out);
-                return;
-            }
-        }
-        i += len + 1;
-    }
+    if (cmdline_value_after("fs_homepath", out, sz) != 0) out[0] = 0;
 }
 
-/* Mirror of parse_cmdline_fs_homepath, for the mod dir. CoD1 writes the g_log
- * (games_mp.log, where PAM prints [STATS_EVENT]) into fs_homepath/<fs_game>/ when a
- * mod is loaded, NOT main/. */
+/* CoD1 writes the g_log (games_mp.log, where PAM prints [STATS_EVENT]) into
+ * fs_homepath/<fs_game>/ when a mod is loaded, NOT main/. */
 static void parse_cmdline_fs_game(char *out, size_t sz) {
-    FILE *f = fopen("/proc/self/cmdline", "r");
-    if (!f) return;
-    char cmdline[4096] = {0};
-    size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, f);
-    fclose(f);
-    size_t i = 0;
-    while (i < n) {
-        const char *arg = &cmdline[i];
-        size_t len = strlen(arg);
-        if (len == 0) { i++; continue; }
-        if (strcasecmp(arg, "fs_game") == 0) {
-            size_t val = i + len + 1;
-            if (val < n && cmdline[val]) {
-                strncpy(out, &cmdline[val], sz - 1);
-                out[sz - 1] = 0;
-                strip_quotes(out);
-                return;
-            }
-        }
-        i += len + 1;
-    }
+    if (cmdline_value_after("fs_game", out, sz) != 0) out[0] = 0;
 }
 
 static int parse_cmdline_maxclients(void) {
