@@ -1,0 +1,22 @@
+# This project targets Linux (cod_lnxded). Force LF so shell scripts and source
+# never get CRLF when checked out on Windows (which breaks `bash scripts/*.sh`).
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.c    text eol=lf
+*.h    text eol=lf
+*.gsc  text eol=lf
+*.cfg  text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+
+# Binary assets (never touch EOL)
+*.so   binary
+*.pk3  binary
+*.dds  binary
+*.png  binary
+*.tga  binary
+*.bz2  binary
+cod_lnxded        binary
+game.mp.i386.so   binary

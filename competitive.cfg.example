@@ -1,0 +1,10 @@
+# competitive.cfg - fair-play cvar limits pushed to every client running the mod.
+#   <cvar> <value>       -> locked to exactly <value> (player CANNOT change it)
+#   <cvar> <min> <max>   -> clamped into [min,max] (player picks a value inside)
+# Lines starting with # or ; are comments. Drop this file (renamed competitive.cfg)
+# next to cod_lnxded, or point COD1RELOADED_COMPETITIVE_FILE at it.
+
+com_maxfps      125 250
+snaps           40
+cl_maxpackets   125
+rate            25000

@@ -29,6 +29,7 @@
 #include "cod1reloaded.h"
 #include "lean_hitbox.h"
 #include "perbone_hit.h"
+#include "pose_sync.h"
 #include "antilag.h"
 #include "anim_clamp.h"
 #include "competitive_sv.h"
@@ -1372,6 +1373,12 @@ static void __attribute__((constructor)) init(void) {
     /* cod1reloaded: per-bone bullet hit refinement (fine phase on top of the
      * box shift). Off unless COD1RELOADED_PERBONE_HIT is set (dump | on). */
     perbone_hit_init();
+
+    /* cod1reloaded: reproduce the CLIENT's drawn pose (view-locked swing + lean
+     * body shift) inside the server's own controllers, so the tested skeleton is
+     * the drawn one - the cod2x principle, replacing perbone's compensations.
+     * Off unless COD1RELOADED_POSE_SYNC=1. */
+    pose_sync_init();
 
     /* cod1reloaded: server-side lag compensation. CoD1 has NO native antilag;
      * this implements it and reads the (previously dead) g_antilag cvar so

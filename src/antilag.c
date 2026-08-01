@@ -87,6 +87,7 @@ static long g_shots = 0, g_heals = 0;
 static int  g_log_left = 20;
 
 static void restore_others(void);
+extern int g_bullet_in_flight;   /* defined below, read by perbone_hit.c */
 
 static int   level_time(void) { return *(int*)(g_base + RVA_level + LEVEL_TIME_OFF); }
 static char* ent_at(int i)    { return (char*)(g_base + RVA_g_entities) + (size_t)i * GENTITY_SIZE; }
@@ -165,6 +166,16 @@ static void hook_ClientEndFrame(void* ent) {
         fflush(stdout);
     }
 
+    /* Same self-heal for the bullet counter: a longjmp out of the fire chain
+     * (G_Error deep in the damage code) would skip the decrement forever, and
+     * perbone would then treat every sight probe as a bullet - the GRANT-storm
+     * class. ClientEndFrame always runs outside any fire. */
+    if (!g_in_fire && g_bullet_in_flight != 0) {
+        printf("%s SELF-HEAL: bullet counter stuck at %d, reset\n", TAG, g_bullet_in_flight);
+        fflush(stdout);
+        g_bullet_in_flight = 0;
+    }
+
     const size_t delta = (size_t)((char*)ent - (char*)(g_base + RVA_g_entities));
     if (delta % GENTITY_SIZE) return;
     const int cn = (int)(delta / GENTITY_SIZE);
@@ -207,8 +218,27 @@ static void restore_others(void) {
 }
 
 /* ---- the fire hook: wrap the bullet trace ------------------------------ */
+
+/* Non-zero exactly while a real bullet (Bullet_Fire_Extended, penetration
+ * included) is being traced. perbone_hit reads this to act ONLY on bullets:
+ * the game also calls trap_LocationalTrace every frame for sight/crosshair
+ * probes, and rewriting those flooded hits onto leaning players ("GRANT" storm,
+ * hundreds/s with nobody firing). Counter, not flag: the fire fn recurses. */
+int g_bullet_in_flight = 0;
+
+static int hook_bullet_fire_inner(void* shooter, int a2, int a3, int a4, int a5,
+                                  int depth, void* a7, int a8);
+
 static int hook_bullet_fire(void* shooter, int a2, int a3, int a4, int a5,
                             int depth, void* a7, int a8) {
+    g_bullet_in_flight++;
+    int r = hook_bullet_fire_inner(shooter, a2, a3, a4, a5, depth, a7, a8);
+    g_bullet_in_flight--;
+    return r;
+}
+
+static int hook_bullet_fire_inner(void* shooter, int a2, int a3, int a4, int a5,
+                                  int depth, void* a7, int a8) {
     /* depth > 0 = penetration recursion: the world is already rewound */
     if (g_in_fire || depth != 0 || !antilag_on())
         return orig_bullet_fire(shooter, a2, a3, a4, a5, depth, a7, a8);

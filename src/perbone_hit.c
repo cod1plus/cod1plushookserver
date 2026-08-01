@@ -66,13 +66,14 @@ static const unsigned char LT_PROLOGUE[7] = { 0x55, 0x89, 0xe5, 0x53, 0x83, 0xec
 /* ---- gentity_t / gclient offsets ---- */
 /* MUST MATCH mss32/lean_fix.cpp body_shift_* and lean_hitbox.c LEAN_BODY_SHIFT_*. */
 #define PB_BODY_SHIFT_SCALE        1.0f
-#define PB_BODY_SHIFT_RIGHT_SCALE  3.0f
+#define PB_BODY_SHIFT_RIGHT_SCALE  2.0f   /* = client body_shift_right_scale (validated) */
 
 #define E_MINS        0x104   /* r.mins vec3 (disasm-confirmed, see lean_hitbox.c) */
 #define E_MAXS        0x110   /* r.maxs vec3 */
 #define E_CLIENT      0x15c
 #define E_ORIGIN      0x138   /* r.currentOrigin vec3 */
 #define GENTITY_SIZE  0x31c
+#define E_HEALTH      0x238   /* int; the dead keep a client ptr + stale leanf */
 #define PS_LEANF      0x40
 #define PS_VIEWYAW    0xc4
 
@@ -132,14 +133,78 @@ static addlean_t  p_AddLean     = NULL;
 /* ---- config ---- */
 static int   g_mode      = 0;     /* 0 off, 1 on, 2 dump */
 static float g_radius    = 5.0f;  /* per-bone sphere radius (body) */
-static float g_head_rad  = 4.5f;  /* head capsule radius (skull half-width) */
-static float g_head_len  = 8.0f;  /* head capsule length, from the head bone up the skull */
+/* ==== VALIDATED IN GAME 2026-07-31 - do not change without re-running the probe ====
+ * The whole head model, as accepted by the players after a full calibration session.
+ * Probe: victim holds a lean, immobile; aim at the LEAN-SIDE EDGE of the drawn helmet;
+ * read miss0 (bullet distance to the posed skull axis). Covered span = shift +/- rad.
+ *
+ * DO NOT touch g_head_len to reach the top of the skull: the capsule axis TILTS with
+ * the lean, so lengthening it pushes the whole volume sideways and destroys the
+ * lateral calibration (tried live, "full bugge"). Use g_head_rad_crouch / g_head_rad
+ * for coverage - a radius grows the volume without moving the axis. */
+static float g_head_rad  = 5.0f;  /* stand: validated ("binary" hits vs misses at 5.0) */
+static float g_head_len  = 8.0f;  /* engine-shaped; see the warning above */
 static float g_neck_rad  = 3.0f;  /* neck sphere radius (the neck is thin) */
 static float g_cap_scale = 1.0f;  /* limb capsule radius multiplier */
-/* Global multiplier on the lean offset. 1.0 = the real offset; the per-bone
- * height scaling is what shapes it. Lowering this re-introduces the bug. */
+/* Multiplier on the mirrored body-shift offset. DEFAULT 1: compute_lean now
+ * reproduces the client's drawn tag_origin shift EXACTLY (stand-only, per-side lf
+ * scaling - see the audited comment there), so mirroring it in full is correct.
+ * The old default-0 rationale (bracket log favoring miss0) was measured during
+ * the window when the client shift was itself removed - superseded. */
 static float g_lean_frac = 1.0f;
+/* Drawn-vs-posed head offset in UNITS at a half lean, per stance and side - the whole
+ * body-shift model, with no K table or factor in between. Measured by aiming at the
+ * LEAN-SIDE EDGE of the drawn helmet and reading miss0 (bullet distance to the posed
+ * skull axis): stand-left edge 9.5 with a 5.0 radius => the drawn centre sits ~4.5
+ * past the posed skull; crouch-left edge 10.5 => ~5.5. The right-side values are
+ * provisional until the same probe is run there.
+ * Env: COD1RELOADED_PERBONE_SHIFT_SL / _SR / _CL / _CR. */
+static float g_shift_sl = 4.7f;   /* stand,  lean left  - VALIDATED */
+static float g_shift_sr = 2.0f;   /* stand,  lean right - provisional, never probed */
+static float g_shift_cl = 5.7f;   /* crouch, lean left  - VALIDATED */
+static float g_shift_cr = 2.5f;   /* crouch, lean right - provisional, never probed */
+/* Separate head radius for CROUCH. All of the night's calibration was done standing;
+ * crouched, aimed shots at the drawn helmet's edge measured 6.4-7.0 from the skull
+ * axis against a 4.5 capsule ("impossible de hit son cote gauche de la tete") while
+ * centre shots landed - i.e. the capsule is correctly PLACED but too narrow for the
+ * crouch pose. 0 = use the standing radius. */
+/* 1 = the body shift fades to zero at ground level (a leaning body pivots on its
+ * feet). Head-height bones keep the full calibrated value. */
+static int   g_shift_taper = 1;
+static float g_head_rad_crouch = 6.0f;   /* VALIDATED: crouch needs the extra width to
+                                          * reach the top of the drawn helmet. Stand is
+                                          * untouched by this (box height gate). */
+/* Second, lean-offset head axis for the tilted-helmet corner. It was a COMPENSATION
+ * for the server skull sitting off the drawn one; pose_sync now places the skull
+ * correctly, so it only adds a generous lobe on the lean side (measured: granted a
+ * headshot at 5.6 when the capsule radius is 5.0). DEFAULT OFF; re-enable with
+ * COD1RELOADED_PERBONE_CORNER=1 only if pose_sync is disabled. */
+static int   g_corner  = 0;
+/* Fraction of the ENGINE eye lean (G_AddLean, ~20u) to add on top of the pose.
+ * DEFAULT 0, and that is not a disable switch - it is the correct value.
+ * G_DObjCalcPose already bends the skeleton sideways when the player leans
+ * (measured live: the head bone sits 9 to 14 units off-centre at leanf 0.5 with
+ * nothing added, where a neutral pose has it at 0). The 16/20 constants are the
+ * offset of the EYE and of the damage points, not of the model. Adding them put
+ * the head at ~29 instead of ~14 and every head shot missed by 12 to 13 units -
+ * that was the "impossible to shoot a leaning head" bug. Raise only if a dump
+ * ever proves the server pose does NOT bend. */
+static float g_eye_lean  = 0.0f;
 static int    g_debug    = 0;   /* COD1RELOADED_PERBONE_DEBUG=1 -> log the head miss distance */
+static int    g_strict   = 0;   /* 1 = box hit with no bone is ALWAYS discarded */
+static int    g_swing_sync = 1; /* v2: force server swing yaw to view for STANDING
+                                 * leaners, save/restore around each trace (v1 wrote
+                                 * persistently+blanket -> neck deformation + rotated
+                                 * a hidden croucher out of cover; both fixed by
+                                 * stand-only + restore). SWINGSYNC=0 disables. */
+/* Margin band for the no-bone case on a LEANING victim (the widened box holds both his
+ * real bent body AND the empty upright silhouette). Bullet within this distance of some
+ * bone surface = plausibly the body (capsule gap, pose error) -> keep as generic damage.
+ * Farther than this from EVERY bone = the vacated silhouette -> delete. Binary versions
+ * of this both failed live: always-delete ate legitimate bullets ("3 chargeurs vides"),
+ * always-keep resurrected the standing ghost ("sa hitbox agit comme s'il etait stand"). */
+static float g_reject_margin = 3.0f;   /* VALIDATED: 5.0 granted hits in open air next
+                                        * to a leaner, 1.5 deleted legitimate grazes. */
 static int    g_in_trace = 0;
 static time_t g_last_dump = 0;   /* dump-mode throttle: re-dump the pose 1/2s */
 
@@ -215,6 +280,17 @@ static float seg_seg_dist2(const float* p1, const float* q1,
  * under-shift a crouched head. */
 static void lean_at_height(const float lean[3], float local_z, float ref_z, float out[3])
 {
+    /* TAPER BY HEIGHT. A leaning body pivots about the feet: the head swings the
+     * measured amount, the legs barely move. Applying the shift uniformly put the leg
+     * spheres several units out in open air on the lean side - "je tire a cote de ses
+     * jambes et ca le touche quand meme". ref_z is passed as the HEAD's local height,
+     * so a bone at head height receives exactly the calibrated shift (the validated
+     * numbers are unchanged) and a bone at the ground receives none.
+     * COD1RELOADED_PERBONE_SHIFT_TAPER=0 restores the old uniform behaviour. */
+    if (!g_shift_taper) {
+        out[0] = lean[0]; out[1] = lean[1]; out[2] = lean[2];
+        return;
+    }
     float f = (ref_z > 1.0f) ? (local_z / ref_z) : 1.0f;
     if (f < 0.0f) f = 0.0f;
     if (f > 1.0f) f = 1.0f;
@@ -254,48 +330,87 @@ static const limbcap_t LIMB_CAPS[] = {
 };
 #define NUM_LIMB_CAPS ((int)(sizeof(LIMB_CAPS)/sizeof(LIMB_CAPS[0])))
 
-/* FULL lean offset (the eye's). Per-bone scaling by height is done by
- * lean_at_height() - do not pre-scale it here. */
+/* What must be ADDED to the posed skeleton so the bones land where the client draws them.
+ *
+ * The pose itself already carries the lean: G_DObjCalcPose bends the skeleton, so the
+ * bone matrices come back with the torso and head displaced sideways - and the bracket
+ * measurement showed that is ALREADY where the client draws them (adding the client's
+ * tag_origin body shift made every aimed shot pass farther, hence g_lean_frac 0).
+ *
+ * The engine eye lean (16/20) is deliberately NOT added either: see g_eye_lean. */
 static void compute_lean(void* ent, void* cl, float out[3])
 {
     out[0] = out[1] = out[2] = 0.0f;
     float leanf = *(float*)((char*)cl + PS_LEANF);
     if (leanf == 0.0f) return;
     float yaw = *(float*)((char*)cl + PS_VIEWYAW);
+
+    /* DIRECTION READ FROM THE POSE ITSELF, not from p_AddLean. Measured live: with
+     * the p_AddLean direction the mirror pushed the capsule the WRONG WAY on a left
+     * lean (aimed helmet shots went from 3.3u off to unhittable) - its sign
+     * convention is not the client body_shift's, which the client source itself
+     * flagged as unverified. The posed skeleton already leans, so the vector from
+     * the entity origin to the posed head IS the lean direction, per side, with no
+     * convention to guess. */
     float off[3] = { 0.0f, 0.0f, 0.0f };
-    p_AddLean(off, yaw, leanf, 16.0f, 20.0f);   /* the EYE's offset, ~20 units */
-
-    /* The drawn body goes FURTHER than the eye: the client's animation controller adds
-     * tag_origin_offset[1] on top (the helicopter fix, mss32/lean_fix.cpp). Without this
-     * term the bones land at ~20 while the model is at 25 to 32.5, and every head shot
-     * misses by 5 to 12 units - which is what happened when only the eye offset was
-     * used. KEEP IN STEP with lean_fix.cpp body_shift_* and lean_hitbox.c
-     * LEAN_BODY_SHIFT_*: all three describe the same displacement. */
-    float* mins = (float*)((char*)ent + E_MINS);
-    float* maxs = (float*)((char*)ent + E_MAXS);
-    const int is_crouch = (maxs[2] - mins[2]) < 55.0f;   /* stand ~70, crouch ~40 */
-    const int is_left   = (leanf < 0.0f);
-    float K = is_crouch ? (is_left ? 12.5f : 2.5f) : (is_left ? 5.0f : 2.5f);
-    if (!is_left) K *= PB_BODY_SHIFT_RIGHT_SCALE;
-    const float body_extra = K * fabsf(leanf) * PB_BODY_SHIFT_SCALE;
-
+    p_AddLean(off, yaw, leanf, 16.0f, 20.0f);
     float mag = sqrtf(off[0]*off[0] + off[1]*off[1]);
-    if (mag > 0.01f) {
-        off[0] += (off[0] / mag) * body_extra;
-        off[1] += (off[1] / mag) * body_extra;
+
+    float ux = 0.0f, uy = 0.0f;
+    {
+        float hm[16];
+        float* org = (float*)((char*)ent + E_ORIGIN);
+        if (p_WorldTag(ent, "Bip01 Head", hm)) {
+            float dx = hm[12] - org[0], dy = hm[13] - org[1];
+            float dl = sqrtf(dx*dx + dy*dy);
+            if (dl > 0.5f) { ux = dx/dl; uy = dy/dl; }
+        }
+        if (ux == 0.0f && uy == 0.0f) {          /* pose unavailable: fall back */
+            if (mag < 0.01f) return;
+            ux = off[0]/mag; uy = off[1]/mag;
+        }
     }
 
-    out[0] = off[0] * g_lean_frac;
-    out[1] = off[1] * g_lean_frac;
-    out[2] = off[2] * g_lean_frac;
+    /* MIRROR OF THE CLIENT'S DRAWN BODY SHIFT (cod2x table, animation.cpp:186-199).
+     * Magnitude = K x factor x |leanf| along the pose's own lean direction; the
+     * factors are env-tunable and were measured by aiming at the drawn helmet and
+     * reading miss0/miss/miss2 (see g_shift_l / g_shift_r).
+     *
+     * An earlier audit concluded the client zeroes its lean controllers when
+     * crouched and the crouch rows were deleted; live measurement contradicted it
+     * (crouched left-lean helmet shots sat 6.4-7.0 off the posed skull, matching
+     * crouch-left K 12.5 x .5 = 6.25), so the stance-aware table is back. */
+    float* mins = (float*)((char*)ent + E_MINS);
+    float* maxs = (float*)((char*)ent + E_MAXS);
+    float  body = 0.0f;
+    {
+        /* DIRECT UNITS - one number per stance and side: how far the DRAWN head sits
+         * past the posed skull, in units, at a half lean. No K table, no factor, no
+         * scale: every earlier formula routed through cod2x's K rows times a factor
+         * times a multiplier, so no adjustment was predictable and each fix broke
+         * another stance. Measure with the bracket columns, set the number, done.
+         * Scales linearly with |leanf| (0.5 = the usual held lean). */
+        const int is_crouch = (maxs[2] - mins[2]) < 55.0f;
+        const int is_left   = (leanf < 0.0f);
+        const float u = is_crouch ? (is_left ? g_shift_cl : g_shift_cr)
+                                  : (is_left ? g_shift_sl : g_shift_sr);
+        body = u * (fabsf(leanf) / 0.5f);
+    }
+
+    const float total = body + g_eye_lean * mag;
+
+    out[0] = ux * total * g_lean_frac;
+    out[1] = uy * total * g_lean_frac;
+    out[2] = 0.0f;
 }
 
 /* Pose the victim, test the bullet segment vs a sphere on every bone.
  * Returns the hitloc of the NEAREST bone hit (by fraction along the bullet),
  * or HL_NONE for no bone. Fills hit_pos with the bone world position. */
 static int perbone_test(void* ent, void* cl, const float* start, const float* end,
-                        float hit_pos[3])
+                        float hit_pos[3], float* min_clear)
 {
+    *min_clear = 1e9f;   /* distance from the bullet to the nearest bone SURFACE */
     p_CalcPose(ent);
     int    n   = p_NumBones(ent);
     float* arr = p_MatrixArray(ent);
@@ -313,24 +428,60 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
         float z = arr[(long)i * 16 + 14];
         if (z > ref_z) ref_z = z;
     }
+    /* Reference height for the shift taper = the HEAD bone, not the topmost bone, so
+     * a head-height bone gets exactly the calibrated shift (helmet bones above it are
+     * clamped to 1.0) while legs fade to zero. */
+    {
+        float hm[16];
+        float* org0 = (float*)((char*)ent + E_ORIGIN);
+        if (p_WorldTag(ent, "Bip01 Head", hm)) {
+            float hz = hm[14] - org0[2];
+            if (hz > 1.0f) ref_z = hz;
+        }
+    }
 
     int   best_hl = HL_NONE;
     float best_t  = 2.0f;
 
-    /* BODY + LIMBS first; HEAD + NECK are tested LAST and WIN (see end of fn). */
-    for (int i = 0; i < n; ++i) {
+    /* BODY + LIMBS first; HEAD + NECK are tested LAST and WIN (see end of fn).
+     * Only the CHARACTER rig (~80 bones, character_soviet_coat3): the tail of the
+     * matrix array is the carried WEAPON's bones, which sit at chest/shoulder
+     * height and were classified TORSO by hitloc_for_z - shooting the air where
+     * the gun points registered as body damage. */
+    int nbody = n > 80 ? 80 : n;
+    for (int i = 0; i < nbody; ++i) {
         const float* m = arr + (long)i * 16;          /* 0x40 = 16 floats */
         float sc[3];
         lean_at_height(lean, m[14], ref_z, sc);       /* m[14] already local */
         float w[3] = { m[12] + org[0] + sc[0],
                        m[13] + org[1] + sc[1],
                        m[14] + org[2] + sc[2] };
+        /* HEAD/HELMET TERRITORY IS OFF-LIMITS to the generic loop. The skull, face
+         * and helmet bones live above local z~56; sphere-testing them classified
+         * hits as TORSO (hitloc_for_z caps at torso_upper) and created a diffuse
+         * hittable volume above the shoulders/head - measured live: granted "torso"
+         * impacts at z 62-68, above the drawn helmet. Only the NAMED skull capsule
+         * (tight, r=g_head_rad) and neck sphere may claim that region. */
+        if (m[14] >= 56.0f) continue;
         int   hl  = hitloc_for_z(m[14]);              /* body zone only (never head/neck) */
+        /* Shoulder band (clavicles, z>=48): full-radius spheres bulged into the
+         * visible head/shoulder GAP. 3.5 still protruded ~1u ("hit epaule alors
+         * que je suis pas dessus" on gap probes that correctly missed the head);
+         * 3.0 hugs the drawn deltoid. The arm capsule (trimmed) covers the outer
+         * shoulder mass below. */
+        float rr = (m[14] >= 48.0f) ? g_radius - 2.0f : g_radius;
         float t;
-        if (pt_seg_dist2(w, start, end, &t) <= g_radius*g_radius && t < best_t) {
+        float d2 = pt_seg_dist2(w, start, end, &t);
+        {   float c = sqrtf(d2) - rr;
+            if (c < *min_clear) *min_clear = c; }
+        if (d2 <= rr*rr && t < best_t) {
             best_t  = t;
             best_hl = hl;
-            hit_pos[0] = w[0]; hit_pos[1] = w[1]; hit_pos[2] = w[2];
+            /* impact point ON the bullet path (the bone centre is up to g_radius off
+             * the ray, which desyncs endpos from the fraction we later write) */
+            hit_pos[0] = start[0] + t*(end[0]-start[0]);
+            hit_pos[1] = start[1] + t*(end[1]-start[1]);
+            hit_pos[2] = start[2] + t*(end[2]-start[2]);
         }
     }
 
@@ -339,9 +490,21 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
         float A[3], B[3];
         if (!bone_world_by_name(ent, LIMB_CAPS[i].a, lean, org[2], ref_z, A)) continue;
         if (!bone_world_by_name(ent, LIMB_CAPS[i].b, lean, org[2], ref_z, B)) continue;
+        /* UPPER-ARM capsules: start 30% below the shoulder joint. At full radius the
+         * capsule top reached z~58 and filled the visible shoulder/head gap ("je vise
+         * entre l'epaule et la tete, colle au corps, ca touche"). The joint itself
+         * stays covered by the slim z>=48 band sphere (r3.5) of the body loop. */
+        if (LIMB_CAPS[i].hitloc == HL_R_ARM_U || LIMB_CAPS[i].hitloc == HL_L_ARM_U) {
+            A[0] += 0.30f * (B[0] - A[0]);
+            A[1] += 0.30f * (B[1] - A[1]);
+            A[2] += 0.30f * (B[2] - A[2]);
+        }
         float rr = LIMB_CAPS[i].radius * g_cap_scale;
         float t, cp[3];
-        if (seg_seg_dist2(start, end, A, B, &t, cp) <= rr*rr && t < best_t) {
+        float d2 = seg_seg_dist2(start, end, A, B, &t, cp);
+        {   float c = sqrtf(d2) - rr;
+            if (c < *min_clear) *min_clear = c; }
+        if (d2 <= rr*rr && t < best_t) {
             best_t  = t;
             best_hl = LIMB_CAPS[i].hitloc;
             hit_pos[0] = cp[0]; hit_pos[1] = cp[1]; hit_pos[2] = cp[2];
@@ -362,9 +525,15 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
         const int have_neck = bone_world_by_name(ent, "Bip01 Neck", lean, org[2], ref_z, Np);
         if (have_neck) {
             float t;
-            if (pt_seg_dist2(Np, start, end, &t) <= g_neck_rad*g_neck_rad) {
+            float nd2 = pt_seg_dist2(Np, start, end, &t);
+            {   float c = sqrtf(nd2) - g_neck_rad;
+                if (c < *min_clear) *min_clear = c; }
+            if (nd2 <= g_neck_rad*g_neck_rad) {
                 best_hl = HL_NECK;
-                hit_pos[0]=Np[0]; hit_pos[1]=Np[1]; hit_pos[2]=Np[2];
+                /* impact point ON the bullet path, not the bone centre */
+                hit_pos[0] = start[0] + t*(end[0]-start[0]);
+                hit_pos[1] = start[1] + t*(end[1]-start[1]);
+                hit_pos[2] = start[2] + t*(end[2]-start[2]);
             }
         }
         float Hp[3];
@@ -381,7 +550,31 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
                                Hp[2]+up[2]*g_head_len };
             float t, cp[3];
             float d2 = seg_seg_dist2(start, end, Hp, crown, &t, cp);
-            if (d2 <= g_head_rad*g_head_rad) {
+            /* NOTE - two attempts at removing the capsule's lower hemisphere (the
+             * "skirt" that reaches a radius below the head bone, into the visible
+             * head/shoulder gap) were both WORSE and are recorded here so they are
+             * not retried blind:
+             *   1. raising the axis base by one radius -> the volume becomes a cone
+             *      tip AT head height; aimed helmet shots missed by 7u.
+             *   2. rejecting impacts below the head bone -> `cp` is the closest point
+             *      on the BULLET, not on the skull axis, so a level shot from eye
+             *      height sits ~1u above the threshold and any downhill/crouched
+             *      shooter is rejected: heads became unhittable on BOTH sides.
+             * A correct version must use the closest point on the AXIS (c2 in
+             * seg_seg_dist2, currently not returned) or taper the radius along it.
+             * Until then the skirt stays: a slightly generous gap is far cheaper
+             * than unhittable heads. */
+            /* crouch gets its own radius: the standing calibration does not carry
+             * over to the crouch pose (see g_head_rad_crouch). */
+            float hr = g_head_rad;
+            if (g_head_rad_crouch > 0.0f) {
+                float* mns2 = (float*)((char*)ent + E_MINS);
+                float* mxs2 = (float*)((char*)ent + E_MAXS);
+                if (mxs2[2] - mns2[2] < 55.0f) hr = g_head_rad_crouch;
+            }
+            {   float c = sqrtf(d2) - hr;
+                if (c < *min_clear) *min_clear = c; }
+            if (d2 <= hr*hr) {
                 best_hl = HL_HEAD;
                 hit_pos[0]=cp[0]; hit_pos[1]=cp[1]; hit_pos[2]=cp[2];
             }
@@ -398,13 +591,105 @@ static int perbone_test(void* ent, void* cl, const float* start, const float* en
                     time_t now = time(NULL);
                     if (now != last_dbg) {
                         last_dbg = now;
+                        /* BRACKET THE SHIFT. A single miss distance cannot separate a
+                         * misplaced head from a shooter who was simply off target, and
+                         * the tester said as much ("jsuis meme pas sur toi defois"). So
+                         * measure the SAME shot against the head placed three ways: no
+                         * shift at all, the current shift, and twice it. Over a handful
+                         * of shots the systematically smallest column is the right
+                         * magnitude, and aim error averages out of the comparison
+                         * because all three see the identical bullet. */
+                        float tt, cp2[3], A[3], B[3];
+                        A[0]=Hp[0]-lean[0]; A[1]=Hp[1]-lean[1]; A[2]=Hp[2]-lean[2];
+                        B[0]=crown[0]-lean[0]; B[1]=crown[1]-lean[1]; B[2]=crown[2]-lean[2];
+                        float m0 = sqrtf(seg_seg_dist2(start, end, A, B, &tt, cp2));
+                        A[0]=Hp[0]+lean[0]; A[1]=Hp[1]+lean[1]; A[2]=Hp[2]+lean[2];
+                        B[0]=crown[0]+lean[0]; B[1]=crown[1]+lean[1]; B[2]=crown[2]+lean[2];
+                        float m2 = sqrtf(seg_seg_dist2(start, end, A, B, &tt, cp2));
                         printf("%s DBG leanf=%.2f leanoff=(%.1f %.1f) ref_z=%.1f "
                                "head=(%.1f %.1f %.1f) org=(%.1f %.1f %.1f) "
-                               "miss=%.1f rad=%.1f -> hitloc=%d\n",
+                               "miss0=%.1f miss=%.1f miss2=%.1f rad=%.1f -> hitloc=%d\n",
                                TAG, leanf, lean[0], lean[1], ref_z,
                                Hp[0], Hp[1], Hp[2], org[0], org[1], org[2],
-                               sqrtf(d2), g_head_rad, best_hl);
+                               m0, sqrtf(d2), m2, g_head_rad, best_hl);
                         fflush(stdout);
+                    }
+                }
+            }
+
+            /* HELMET OUTER CORNER. When leaning, the drawn helmet TILTS with the
+             * skull; a capsule around the bone axis leaves the outer-top CORNER
+             * (the side the player leans toward) uncovered - reported three times
+             * across different radii/mirrors as "his lean-side of the head is
+             * unhittable", i.e. structural, not tuning. Second parallel axis,
+             * offset 2.5u along the lean direction, hugs that outer half. */
+            if (g_corner && best_hl != HL_HEAD) {
+                float lf2 = *(float*)((char*)cl + PS_LEANF);
+                if (lf2 != 0.0f) {
+                    float od[3] = { 0.0f, 0.0f, 0.0f };
+                    p_AddLean(od, *(float*)((char*)cl + PS_VIEWYAW), lf2, 16.0f, 20.0f);
+                    float mg2 = sqrtf(od[0]*od[0] + od[1]*od[1]);
+                    if (mg2 > 0.01f) {
+                        const float ox = od[0]/mg2*2.5f, oy = od[1]/mg2*2.5f;
+                        /* UPPER HALF only: the tilted-helmet corner lives at crown
+                         * height; starting this axis at the head bone reached down
+                         * into the head/shoulder gap on the lean side and granted
+                         * gap hits ("je tire entre epaule et tete, ca hit"). */
+                        float A2[3] = { (Hp[0]+crown[0])*0.5f + ox,
+                                        (Hp[1]+crown[1])*0.5f + oy,
+                                        (Hp[2]+crown[2])*0.5f };
+                        float B2[3] = { crown[0]+ox, crown[1]+oy, crown[2] };
+                        float t2, cpo[3];
+                        float d2o = seg_seg_dist2(start, end, A2, B2, &t2, cpo);
+                        {   float c = sqrtf(d2o) - g_head_rad;
+                            if (c < *min_clear) *min_clear = c; }
+                        if (d2o <= g_head_rad*g_head_rad) {
+                            best_hl = HL_HEAD;
+                            hit_pos[0]=cpo[0]; hit_pos[1]=cpo[1]; hit_pos[2]=cpo[2];
+                        }
+                    }
+                }
+            }
+
+            /* UNION with the UNSHIFTED head. Measured (bracket log): aimed shots
+             * cluster bimodally - half pass 0-2u from the RAW posed head, half
+             * ~1u from the head shifted ~10u out - because the client's drawn
+             * torso tracks the view exactly (swing_fix: tolerance 0, speed 1.0)
+             * while the server's swing keeps the vanilla dead zone, so the drawn
+             * head sits either ON the pose or up to ~10u around the lean arc.
+             * One offset can never cover both modes; testing BOTH candidate
+             * skulls does, exactly. The real fix (patch the server's swing
+             * constants to match the client, cod2x-style) is the next milestone. */
+            if (best_hl != HL_HEAD &&
+                lean[0]*lean[0] + lean[1]*lean[1] > 0.01f) {
+                float zero[3] = { 0.0f, 0.0f, 0.0f };
+                float Hp0[3], Np0[3];
+                const int have_n0 =
+                    bone_world_by_name(ent, "Bip01 Neck", zero, org[2], ref_z, Np0);
+                if (bone_world_by_name(ent, "Bip01 Head", zero, org[2], ref_z, Hp0)) {
+                    float up0[3] = { 0.0f, 0.0f, 1.0f };
+                    if (have_n0) {
+                        up0[0]=Hp0[0]-Np0[0]; up0[1]=Hp0[1]-Np0[1]; up0[2]=Hp0[2]-Np0[2];
+                        float L = sqrtf(dot3(up0, up0));
+                        if (L > 1e-3f) { up0[0]/=L; up0[1]/=L; up0[2]/=L; }
+                        else { up0[0]=0.0f; up0[1]=0.0f; up0[2]=1.0f; }
+                    }
+                    float crown0[3] = { Hp0[0]+up0[0]*g_head_len,
+                                        Hp0[1]+up0[1]*g_head_len,
+                                        Hp0[2]+up0[2]*g_head_len };
+                    /* TIGHTER radius on the raw candidate: truly aimed shots at it
+                     * measured 0.4-2.1u; at the full 6.0 it was promoting TORSO
+                     * grazes (bullet 4.6-5.5 from the raw skull while inside the
+                     * chest) to headshots. */
+                    float r0 = g_head_rad - 2.0f;
+                    if (r0 < 3.0f) r0 = 3.0f;
+                    float t0, cp0[3];
+                    float d20 = seg_seg_dist2(start, end, Hp0, crown0, &t0, cp0);
+                    {   float c = sqrtf(d20) - r0;
+                        if (c < *min_clear) *min_clear = c; }
+                    if (d20 <= r0*r0) {
+                        best_hl = HL_HEAD;
+                        hit_pos[0]=cp0[0]; hit_pos[1]=cp0[1]; hit_pos[2]=cp0[2];
                     }
                 }
             }
@@ -456,26 +741,234 @@ static void dump_bones(void* ent)
     fflush(stdout);
 }
 
+/* ==================== swing sync v2 (save/restore) ==================== */
+/* The modded client draws the torso/legs LOCKED to the view (swing_fix tol 0,
+ * speed 1.0); the server's swing state lags in its vanilla 40-deg dead zone, so a
+ * leaning victim's drawn head sat 0-10u around the lean arc from the posed one
+ * (the measured bimodal miss clusters). Force the server's swing yaw to the view
+ * JUST for the pose used by this trace, then RESTORE - v1 wrote persistently and
+ * blanket, which leaked into the networked pose (neck deformation) and rotated a
+ * hidden crouch-leaning victim's skeleton out of cover. v2: STAND only (crouch
+ * controllers are zeroed on the client, so crouch is already consistent), and
+ * nothing survives the hook. clientinfo = *(GOT bgs @+0x89ab4) + 0x9b6ec +
+ * cn*0x4b0 (0x9b6ec + 64*0x4b0 == sizeof(bgs) exactly); torso.yawAngle +0x3b0,
+ * legs.yawAngle +0x380 - same bg struct offsets as the client. */
+#define RVA_GOT_BGS       0x89ab4
+#define BGS_CLIENTINFO    0x9b6ec
+#define CI_STRIDE         0x4b0
+#define CI_LEGS_YAW       0x380
+#define CI_TORSO_YAW      0x3b0
+
+typedef struct { int used; float torso, legs; } sync_save_t;
+static sync_save_t g_sync_saved[PB_MAX_CLIENTS];
+
+static char* ci_of(int i)
+{
+    char* bgs = *(char**)(g_base + RVA_GOT_BGS);
+    if (!bgs) return NULL;
+    return bgs + BGS_CLIENTINFO + (size_t)i * CI_STRIDE;
+}
+
+/* Fresh-pose every leaning player (the engine never poses in normal play - the
+ * per-frame G_DObjCalcPose is gated behind the debug dvar g_debugLocDamage,
+ * je @0x3b2b5), with the swing yaw forced to the view for STANDING leaners. */
+static void sync_force_and_pose(void)
+{
+    for (int i = 0; i < PB_MAX_CLIENTS; ++i) {
+        char* ge = (char*)(g_base + RVA_g_entities) + (size_t)i * GENTITY_SIZE;
+        void* c  = *(void**)(ge + E_CLIENT);
+        if (!c) continue;
+        if (*(int*)(ge + E_HEALTH) <= 0) continue;       /* never pose corpses */
+        if (*(float*)((char*)c + PS_LEANF) == 0.0f) continue;
+        if (g_swing_sync) {
+            float* mns = (float*)(ge + E_MINS);
+            float* mxs = (float*)(ge + E_MAXS);
+            if (mxs[2] - mns[2] >= 55.0f) {              /* STAND only */
+                char* ci = ci_of(i);
+                if (ci && !g_sync_saved[i].used) {
+                    g_sync_saved[i].torso = *(float*)(ci + CI_TORSO_YAW);
+                    g_sync_saved[i].legs  = *(float*)(ci + CI_LEGS_YAW);
+                    g_sync_saved[i].used  = 1;
+                    float vy = *(float*)((char*)c + PS_VIEWYAW);
+                    *(float*)(ci + CI_TORSO_YAW) = vy;
+                    *(float*)(ci + CI_LEGS_YAW)  = vy;
+                }
+            }
+        }
+        p_CalcPose(ge);
+    }
+}
+
+static void sync_restore(void)
+{
+    for (int i = 0; i < PB_MAX_CLIENTS; ++i) {
+        if (!g_sync_saved[i].used) continue;
+        g_sync_saved[i].used = 0;
+        char* ci = ci_of(i);
+        if (!ci) continue;
+        *(float*)(ci + CI_TORSO_YAW) = g_sync_saved[i].torso;
+        *(float*)(ci + CI_LEGS_YAW)  = g_sync_saved[i].legs;
+    }
+}
+
 /* ============================== the hook ============================== */
-static void Hook_LocationalTrace(pb_trace_t* tr, const float* start, const float* end,
+static void hook_lt_body(pb_trace_t* tr, const float* start, const float* end,
                                  int passEnt, int mask, int sight)
 {
-    real_loctrace(tr, start, end, passEnt, mask, sight);   /* BROAD: engine box trace */
+    /* Only act on REAL bullets. The game calls trap_LocationalTrace every frame
+     * for sight/crosshair probes too; treating those as shots produced a storm of
+     * granted hits with nobody firing. The flag is maintained by antilag.c's
+     * always-installed Bullet_Fire hook. */
+    extern int g_bullet_in_flight;
+    const int is_bullet = (g_bullet_in_flight > 0);
+
+    if (!g_in_trace && is_bullet)
+        sync_force_and_pose();
+
+    real_loctrace(tr, start, end, passEnt, mask, sight);   /* engine per-part trace */
 
     if (g_in_trace) return;
+    if (!is_bullet) return;   /* sight/crosshair probes: engine answer untouched */
+    if (g_mode == 3) {
+        /* pose-only: the engine's answer IS the answer. With DEBUG, expose it - all
+         * night we only ever logged perbone's OWN verdicts, never the engine's. This
+         * line is the ground truth: what the per-part clipper says about a bullet at a
+         * leaning player, with the skeleton freshly posed. */
+        if (g_debug) {
+            /* Log EVERY shot that passes near a leaning player - including total
+             * misses. The first instrument only printed when the trace HIT the
+             * player, which made the interesting shots (aimed at the drawn head,
+             * engine says world-miss) invisible. Distance is bullet-ray to the
+             * freshly-posed head bone; ehit=1023 means the engine hit nothing. */
+            static time_t last_eng = 0;
+            time_t now = time(NULL);
+            if (now != last_eng) {
+                float best = 1e9f, bh[3] = {0,0,0}, blf = 0.0f, bor[2] = {0,0};
+                int   bent = -1;
+                for (int i = 0; i < PB_MAX_CLIENTS; ++i) {
+                    char* ge = (char*)(g_base + RVA_g_entities) + (size_t)i * GENTITY_SIZE;
+                    void* c  = *(void**)(ge + E_CLIENT);
+                    if (!c) continue;
+                    float lf = *(float*)((char*)c + PS_LEANF);
+                    if (lf == 0.0f) continue;
+                    float hm[16];
+                    if (!p_WorldTag(ge, "Bip01 Head", hm)) continue;
+                    float t;
+                    float d = sqrtf(pt_seg_dist2(&hm[12], start, end, &t));
+                    if (d < best) {
+                        best = d; bent = i; blf = lf;
+                        bh[0]=hm[12]; bh[1]=hm[13]; bh[2]=hm[14];
+                        float* o = (float*)(ge + E_ORIGIN);
+                        bor[0]=o[0]; bor[1]=o[1];
+                    }
+                }
+                if (bent >= 0 && best < 40.0f) {
+                    last_eng = now;
+                    printf("%s ENG leanf=%.2f target=%d ehit=%d hitloc=%d "
+                           "endpos=(%.1f %.1f %.1f) head=(%.1f %.1f %.1f) "
+                           "org=(%.1f %.1f) headmiss=%.1f\n",
+                           TAG, blf, bent, (int)tr->hitEntityNum, (int)tr->hitLocation,
+                           tr->endpos[0], tr->endpos[1], tr->endpos[2],
+                           bh[0], bh[1], bh[2], bor[0], bor[1], best);
+                    fflush(stdout);
+                }
+            }
+        }
+        return;
+    }
+
+    /* Point traces (start==end) are existence/visibility probes, not bullets - there is
+     * no ray to refine against and the capsule math degenerates. Leave them alone. */
+    {
+        float dx = end[0]-start[0], dy = end[1]-start[1], dz = end[2]-start[2];
+        if (dx*dx + dy*dy + dz*dz < 1.0f) return;
+    }
 
     uint16_t ent = tr->hitEntityNum;
-    if (ent >= PB_MAX_CLIENTS) return;                     /* world / non-player */
+    if (ent >= PB_MAX_CLIENTS) {
+        /* The engine MISSED every player. Measured live (ENG lines): bullets pass
+         * 1-2u from a leaning player's posed SKULL and sail through to the wall
+         * behind (ehit=1022 = ENTITYNUM_WORLD) - the engine's locational path
+         * simply drops leaning players most of the time. That is the 20-year
+         * "see-but-can't-hit" lean, finally measured. GRANT the hit ourselves:
+         * test the bullet - only up to the engine's own stop point, so walls and
+         * cover still protect - against the posed skeleton of every LEANING
+         * player, and rewrite the trace to the nearest bone hit. Non-leaning
+         * players are untouched: the engine registers them fine. */
+        if (g_mode == 2) return;                           /* dump: observe only */
+        float seg_end[3] = { tr->endpos[0], tr->endpos[1], tr->endpos[2] };
+        float bestf = 2.0f, besthp[3] = {0,0,0};
+        int   besti = -1, besthl = HL_NONE;
+        g_in_trace = 1;
+        for (int i = 0; i < PB_MAX_CLIENTS; ++i) {
+            /* NEVER the shooter: the muzzle sits beside his own posed skull when
+             * he leans, so without this his own head is the nearest "hit" at
+             * fraction 0 - a leaning shooter instakilled HIMSELF (the frac=0.00
+             * GRANT storm). The engine excludes him via passEnt; so must we. */
+            if (i == passEnt) continue;
+            char* ge = (char*)(g_base + RVA_g_entities) + (size_t)i * GENTITY_SIZE;
+            void* c  = *(void**)(ge + E_CLIENT);
+            if (!c) continue;
+            if (*(int*)(ge + E_HEALTH) <= 0) continue;   /* the dead grant nothing */
+            if (*(float*)((char*)c + PS_LEANF) == 0.0f) continue;
+            /* PRONE: skip - all bones lie within ~6u of the ground, so any round
+             * skimming the body would "graze" the head capsule and everything
+             * became a headshot. The grant exists for the stand/crouch lean peek;
+             * prone stays with the engine. */
+            {
+                float* mns = (float*)(ge + E_MINS);
+                float* mxs = (float*)(ge + E_MAXS);
+                if (mxs[2] - mns[2] < 30.0f) continue;
+            }
+            float hp2[3] = { seg_end[0], seg_end[1], seg_end[2] };
+            float clr = 1e9f;
+            int hl2 = perbone_test(ge, c, start, seg_end, hp2, &clr);
+            if (hl2 == HL_NONE) continue;
+            /* order and report by fraction along the ORIGINAL ray */
+            float sd[3] = { end[0]-start[0], end[1]-start[1], end[2]-start[2] };
+            float L2 = sd[0]*sd[0] + sd[1]*sd[1] + sd[2]*sd[2];
+            float f = (L2 > 1.0f)
+                ? ((hp2[0]-start[0])*sd[0] + (hp2[1]-start[1])*sd[1]
+                 + (hp2[2]-start[2])*sd[2]) / L2 : 0.0f;
+            if (f < 0.0f) f = 0.0f;
+            if (f > 1.0f) f = 1.0f;
+            if (f < bestf) {
+                bestf = f; besti = i; besthl = hl2;
+                besthp[0]=hp2[0]; besthp[1]=hp2[1]; besthp[2]=hp2[2];
+            }
+        }
+        g_in_trace = 0;
+        if (besti >= 0) {
+            tr->hitEntityNum = (uint16_t)besti;
+            tr->hitLocation  = (uint16_t)besthl;
+            tr->fraction     = bestf;
+            tr->endpos[0]=besthp[0]; tr->endpos[1]=besthp[1]; tr->endpos[2]=besthp[2];
+            if (g_debug) {
+                printf("%s GRANT ent=%d hitloc=%d frac=%.2f endpos=(%.1f %.1f %.1f) "
+                       "[engine said world-miss]\n",
+                       TAG, besti, besthl, bestf, besthp[0], besthp[1], besthp[2]);
+                fflush(stdout);
+            }
+        }
+        return;
+    }
 
     char* gent = (char*)(g_base + RVA_g_entities) + (size_t)ent * GENTITY_SIZE;
     void* cl   = *(void**)(gent + E_CLIENT);
     if (!cl) return;
 
+    /* NON-LEANING victim: the engine's per-part verdict is ground truth - it can
+     * emit HELMET(1) and GUN(18), which our capsule model cannot, so overriding it
+     * promoted helmet hits to full headshot damage and gun blocks to body damage.
+     * Refinement exists for LEANERS only (audit HIGH-2). */
+    if (*(float*)((char*)cl + PS_LEANF) == 0.0f) return;
+
     g_in_trace = 1;
     float hp[3] = { end[0], end[1], end[2] };
+    float clear = 1e9f;
     int   hl;
-    if (g_mode == 2) { dump_bones(gent); hl = perbone_test(gent, cl, start, end, hp); }
-    else             { hl = perbone_test(gent, cl, start, end, hp); }
+    if (g_mode == 2) { dump_bones(gent); hl = perbone_test(gent, cl, start, end, hp, &clear); }
+    else             { hl = perbone_test(gent, cl, start, end, hp, &clear); }
     g_in_trace = 0;
 
     if (g_mode == 2) {                                     /* dump: don't override */
@@ -487,15 +980,68 @@ static void Hook_LocationalTrace(pb_trace_t* tr, const float* start, const float
     if (hl != HL_NONE) {                                   /* ACCEPT: bone hit */
         tr->hitLocation = (uint16_t)hl;
         tr->endpos[0] = hp[0]; tr->endpos[1] = hp[1]; tr->endpos[2] = hp[2];
+        /* Keep fraction consistent with the endpos we just wrote: downstream code
+         * (impact FX, penetration, distance falloff) derives the hit point from
+         * fraction*(end-start), and handing it the BOX fraction with a bone endpos
+         * feeds it two different hit points for the same bullet. */
+        {
+            float sd[3] = { end[0]-start[0], end[1]-start[1], end[2]-start[2] };
+            float L2 = sd[0]*sd[0] + sd[1]*sd[1] + sd[2]*sd[2];
+            if (L2 > 1.0f) {
+                float f = ((hp[0]-start[0])*sd[0] + (hp[1]-start[1])*sd[1]
+                         + (hp[2]-start[2])*sd[2]) / L2;
+                if (f < 0.0f) f = 0.0f;
+                if (f > 1.0f) f = 1.0f;
+                tr->fraction = f;
+            }
+        }
         return;
     }
 
-    /* REJECT: box hit, no bone -> world miss (g_entities[1023].takedamage==0). */
+    /* Box hit but no bone: decide by DISTANCE, not by a binary rule. Both binary
+     * versions failed live. Always-delete (the original anti-clip) silently ate every
+     * legitimate bullet that slipped past the tight capsules - "j'ai vide 3 chargeurs",
+     * with the 1s DBG throttle hiding the erased shots. Always-keep (last night's
+     * revert) accepted every bullet through the box, and the widened box still contains
+     * the whole UPRIGHT column - so a leaning player took damage at his vacated
+     * standing silhouette: "sa hitbox agit comme s'il etait toujours stand".
+     *
+     * perbone_test now reports how far the bullet passed from the NEAREST bone surface:
+     *   - within g_reject_margin  -> plausibly the body (capsule gap, pose error):
+     *                                keep the hit, strip the location (generic damage,
+     *                                never a ghost headshot);
+     *   - beyond it on a LEANER   -> the empty silhouette: delete the hit;
+     *   - non-leaning victim      -> engine answer untouched (his box IS his body).
+     * COD1RELOADED_PERBONE_MARGIN tunes the band; STRICT=1 = old full deletion. */
+    if (!g_strict) {
+        float leanf = *(float*)((char*)cl + PS_LEANF);
+        if (leanf == 0.0f) return;
+        if (clear <= g_reject_margin) {
+            tr->hitLocation = HL_NONE;
+            return;
+        }
+        /* fall through to the deletion below */
+    }
+
+    /* strict: box hit, no bone -> world miss (g_entities[1023].takedamage==0). */
     tr->hitEntityNum = ENTITYNUM_NONE;
     tr->hitLocation  = HL_NONE;
     tr->fraction     = 1.0f;
     tr->endpos[0] = end[0]; tr->endpos[1] = end[1]; tr->endpos[2] = end[2];
     tr->surfaceFlags = 0;
+}
+
+/* Wrapper: whatever path the body returns through, the forced swing state is
+ * rolled back before the engine continues - nothing can leak into the networked
+ * pose or a later frame. */
+static void Hook_LocationalTrace(pb_trace_t* tr, const float* start, const float* end,
+                                 int passEnt, int mask, int sight)
+{
+    hook_lt_body(tr, start, end, passEnt, mask, sight);
+    /* Never let a (future) nested invocation roll back the OUTER trace's forced
+     * state mid-flight - today no nesting exists (disasm-proven: nothing on the
+     * pose path reaches trap_LocationalTrace), this is hardening (audit MED-4). */
+    if (!g_in_trace) sync_restore();
 }
 
 /* ============================== install ============================== */
@@ -550,10 +1096,11 @@ static void try_install(void)
         g_base   = base;
         g_last_dump = 0;
         logged   = 0;
-        printf("%s installed (mode=%s, body=%.1f head=%.1f/len%.1f neck=%.1f leanfrac=%.2f, "
-               "game base 0x%08lx) [head capsule + foot->toe]\n",
-               TAG, g_mode == 2 ? "dump" : "on", g_radius, g_head_rad, g_head_len,
-               g_neck_rad, g_lean_frac, (unsigned long)base);
+        printf("%s installed (mode=%s, body=%.1f head=%.1f/len%.1f neck=%.1f leanfrac=%.2f "
+               "eyelean=%.2f strict=%d, game base 0x%08lx) [pose-before-trace]\n",
+               TAG, g_mode == 2 ? "dump" : (g_mode == 3 ? "pose" : "on"),
+               g_radius, g_head_rad, g_head_len,
+               g_neck_rad, g_lean_frac, g_eye_lean, g_strict, (unsigned long)base);
         fflush(stdout);
     } else {
         printf("%s hook_install failed\n", TAG);
@@ -572,7 +1119,9 @@ void perbone_hit_init(void)
 {
     const char* e = getenv("COD1RELOADED_PERBONE_HIT");
     if (!e || *e == '0' || *e == 'o' || *e == 'f' || *e == 'n') return;
-    if (strcmp(e, "dump") == 0 || *e == 'd') g_mode = 2; else g_mode = 1;
+    if (strcmp(e, "dump") == 0 || *e == 'd') g_mode = 2;
+    else if (*e == 'p') g_mode = 3;   /* "pose": fresh-pose leaners, engine decides */
+    else g_mode = 1;
 
     const char* rd = getenv("COD1RELOADED_PERBONE_RADIUS");
     if (rd && *rd) { float v = (float)atof(rd); if (v > 0.0f && v <= 40.0f) g_radius = v; }
@@ -584,6 +1133,29 @@ void perbone_hit_init(void)
     if (hl && *hl) { float v = (float)atof(hl); if (v > 0.0f && v <= 30.0f) g_head_len = v; }
     const char* lf = getenv("COD1RELOADED_PERBONE_LEANFRAC");
     if (lf && *lf) { float v = (float)atof(lf); if (v >= 0.0f && v <= 2.0f) g_lean_frac = v; }
+    const char* el = getenv("COD1RELOADED_PERBONE_EYELEAN");
+    if (el && *el) { float v = (float)atof(el); if (v >= 0.0f && v <= 2.0f) g_eye_lean = v; }
+    const char* st = getenv("COD1RELOADED_PERBONE_STRICT");
+    if (st && *st && *st != '0') g_strict = 1;
+    const char* ss = getenv("COD1RELOADED_PERBONE_SWINGSYNC");
+    if (ss && *ss) g_swing_sync = (*ss != '0');
+    const char* mg = getenv("COD1RELOADED_PERBONE_MARGIN");
+    if (mg && *mg) { float v = (float)atof(mg); if (v >= 0.0f && v <= 30.0f) g_reject_margin = v; }
+    const char* q;
+    if ((q = getenv("COD1RELOADED_PERBONE_SHIFT_SL")) && *q)
+        { float v = (float)atof(q); if (v >= 0.0f && v <= 25.0f) g_shift_sl = v; }
+    if ((q = getenv("COD1RELOADED_PERBONE_SHIFT_SR")) && *q)
+        { float v = (float)atof(q); if (v >= 0.0f && v <= 25.0f) g_shift_sr = v; }
+    if ((q = getenv("COD1RELOADED_PERBONE_SHIFT_CL")) && *q)
+        { float v = (float)atof(q); if (v >= 0.0f && v <= 25.0f) g_shift_cl = v; }
+    if ((q = getenv("COD1RELOADED_PERBONE_SHIFT_CR")) && *q)
+        { float v = (float)atof(q); if (v >= 0.0f && v <= 25.0f) g_shift_cr = v; }
+    const char* co = getenv("COD1RELOADED_PERBONE_CORNER");
+    if (co && *co) g_corner = (*co != '0');
+    const char* tp = getenv("COD1RELOADED_PERBONE_SHIFT_TAPER");
+    if (tp && *tp) g_shift_taper = (*tp != '0');
+    const char* hc = getenv("COD1RELOADED_PERBONE_HEADRAD_CROUCH");
+    if (hc && *hc) { float v = (float)atof(hc); if (v >= 0.0f && v <= 20.0f) g_head_rad_crouch = v; }
     const char* dbg = getenv("COD1RELOADED_PERBONE_DEBUG");
     if (dbg && *dbg && *dbg != '0') g_debug = 1;
     const char* ls = getenv("COD1RELOADED_PERBONE_LIMBSCALE");

@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "cod1reloaded.h"
 #include "hooks.h"   /* hook_unprotect (mprotect RWX) */
@@ -52,6 +53,26 @@ static int  g_protocol         = 10;
 static int  g_min_version      = 16;  /* client "1.6" */
 static int  g_allow_unversioned = 1;  /* allow cod1reloaded==0 (bots / loopback) */
 static int  g_min_build        = 0;  /* 0 = build gate off; e.g. 10602 for 1.6.2 */
+static int  g_min_build_manual = 0;  /* env floor; the auto gate never goes below it */
+
+/* ---- AUTO build gate: follow the latest GitHub release, WITH A GRACE DELAY ----
+ * Raises the minimum build to whatever the release manifest publishes, but only
+ * after g_auto_grace_h hours. Publishing must never empty the server: players get
+ * the update on their next launch, so the newest release is tolerated for a while
+ * before it becomes mandatory. A failed fetch NEVER changes what is enforced
+ * (fail-open by construction) and the state is persisted so a restart does not
+ * reset the delay. The module's own HTTP helper is raw sockets with no TLS and
+ * GitHub is HTTPS-only, so the fetch shells out to curl. */
+static int  g_auto            = 0;    /* COD1RELOADED_MIN_BUILD_AUTO=1 */
+static int  g_auto_grace_h    = 0;    /* COD1RELOADED_MIN_BUILD_GRACE_H; 0 = enforce a
+                                       * new release as soon as it is seen (the client
+                                       * auto-updates at launch, so the window only
+                                       * affects players already in game) */
+static int  g_auto_poll_min   = 5;    /* COD1RELOADED_MIN_BUILD_POLL_MIN */
+static char g_auto_url[512]   =
+    "https://github.com/cod1plus/client/releases/latest/download/manifest.json";
+static char g_auto_state[512] = ".minbuild_state";
+
 static char g_master[MASTER_FIELD_LEN] = "87.106.7.52";
 static int  g_snaps_cap        = 40;  /* max snaps the server honors (real 40-tick, needs sv_fps 40); <=30 = vanilla */
 static int  g_tickdiag         = 0;   /* COD1RELOADED_TICKDIAG=1 -> log level.time/svs.time rate (read-only) */
@@ -61,7 +82,23 @@ static void load_env(void) {
     if ((e = getenv("COD1RELOADED_PROTOCOL"))    && *e) g_protocol    = atoi(e);
     if ((e = getenv("COD1RELOADED_MIN_VERSION")) && *e) g_min_version = atoi(e);
     if ((e = getenv("COD1RELOADED_ALLOW_UNVERSIONED")) && *e) g_allow_unversioned = atoi(e);
-    if ((e = getenv("COD1RELOADED_MIN_BUILD")) && *e) g_min_build = atoi(e);
+    if ((e = getenv("COD1RELOADED_MIN_BUILD")) && *e) {
+        g_min_build = atoi(e);
+        g_min_build_manual = g_min_build;
+    }
+    if ((e = getenv("COD1RELOADED_MIN_BUILD_AUTO"))  && *e) g_auto = atoi(e);
+    if ((e = getenv("COD1RELOADED_MIN_BUILD_GRACE_H")) && *e) g_auto_grace_h = atoi(e);
+    if ((e = getenv("COD1RELOADED_MIN_BUILD_POLL_MIN")) && *e) g_auto_poll_min = atoi(e);
+    if ((e = getenv("COD1RELOADED_MIN_BUILD_URL")) && *e) {
+        strncpy(g_auto_url, e, sizeof(g_auto_url) - 1);
+        g_auto_url[sizeof(g_auto_url) - 1] = 0;
+    }
+    if ((e = getenv("COD1RELOADED_MIN_BUILD_STATE")) && *e) {
+        strncpy(g_auto_state, e, sizeof(g_auto_state) - 1);
+        g_auto_state[sizeof(g_auto_state) - 1] = 0;
+    }
+    if (g_auto_grace_h  < 0)  g_auto_grace_h  = 0;
+    if (g_auto_poll_min < 1)  g_auto_poll_min = 1;
     if ((e = getenv("COD1RELOADED_MASTER"))      && *e) {
         strncpy(g_master, e, sizeof(g_master) - 1);
         g_master[sizeof(g_master) - 1] = 0;
@@ -98,6 +135,107 @@ static int patch_snaps_cap(uintptr_t va, unsigned char newcap) {
     if (hook_unprotect(va, 1) != 0) return -1;
     *p = newcap;
     return 0;
+}
+
+/* ================= AUTO build gate (GitHub release follower) ================= */
+
+/* "1.6.3" -> 10603, the same encoding the client publishes in cod1x_build. */
+static int build_from_version(const char *v) {
+    int p[3] = {0, 0, 0}, i = 0;
+    while (*v && i < 3) {
+        if (*v >= '0' && *v <= '9') p[i] = p[i] * 10 + (*v - '0');
+        else if (*v == '.') i++;
+        else break;
+        v++;
+    }
+    return p[0] * 10000 + p[1] * 100 + p[2];
+}
+
+/* Only fetch URLs made of characters that cannot escape the shell word. */
+static int url_is_safe(const char *u) {
+    for (; *u; ++u) {
+        if ((*u >= 'A' && *u <= 'Z') || (*u >= 'a' && *u <= 'z') ||
+            (*u >= '0' && *u <= '9') || strchr(":/._-~?=&%+", *u)) continue;
+        return 0;
+    }
+    return 1;
+}
+
+/* Returns the published build number, or 0 when the fetch/parse failed. */
+static int fetch_latest_build(void) {
+    if (!url_is_safe(g_auto_url)) return 0;
+    char cmd[700];
+    snprintf(cmd, sizeof(cmd),
+             "curl -sfL --max-time 15 '%s' 2>/dev/null", g_auto_url);
+    FILE *fp = popen(cmd, "r");
+    if (!fp) return 0;
+    char buf[2048];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
+    pclose(fp);
+    if (n == 0) return 0;
+    buf[n] = 0;
+    const char *k = strstr(buf, "\"version\"");
+    if (!k) return 0;
+    k = strchr(k + 9, '"');
+    if (!k) return 0;
+    return build_from_version(k + 1);
+}
+
+static void auto_state_load(int *latest, long *seen, int *enforced) {
+    *latest = 0; *seen = 0; *enforced = 0;
+    FILE *f = fopen(g_auto_state, "r");
+    if (!f) return;
+    if (fscanf(f, "%d %ld %d", latest, seen, enforced) != 3) {
+        *latest = 0; *seen = 0; *enforced = 0;
+    }
+    fclose(f);
+}
+
+static void auto_state_save(int latest, long seen, int enforced) {
+    FILE *f = fopen(g_auto_state, "w");
+    if (!f) return;
+    fprintf(f, "%d %ld %d\n", latest, seen, enforced);
+    fclose(f);
+}
+
+static void *minbuild_thread(void *arg) {
+    (void)arg;
+    int  latest, enforced;
+    long seen;
+    auto_state_load(&latest, &seen, &enforced);
+    if (enforced > g_min_build) g_min_build = enforced;
+
+    for (;;) {
+        const int l = fetch_latest_build();
+        if (l > 0) {
+            const long now = (long)time(NULL);
+            int dirty = 0;
+            if (l != latest) {
+                latest = l;
+                seen   = now;
+                dirty  = 1;
+                if (g_auto_grace_h > 0) {
+                    printf("%s auto build gate: release %d.%d.%d seen, mandatory in %dh\n",
+                           TAG, l / 10000, (l / 100) % 100, l % 100, g_auto_grace_h);
+                    fflush(stdout);
+                }
+            }
+            /* Checked in the SAME pass as the discovery, so a zero grace really is
+             * instant instead of waiting for the next poll. */
+            if (enforced < latest && now - seen >= (long)g_auto_grace_h * 3600L) {
+                enforced = latest;
+                dirty    = 1;
+                printf("%s auto build gate: now requiring %d.%d.%d\n",
+                       TAG, enforced / 10000, (enforced / 100) % 100, enforced % 100);
+                fflush(stdout);
+            }
+            if (dirty) auto_state_save(latest, seen, enforced);
+            const int want = (enforced > g_min_build_manual) ? enforced : g_min_build_manual;
+            g_min_build = want;
+        }
+        sleep((unsigned)g_auto_poll_min * 60u);
+    }
+    return NULL;
 }
 
 /* Read-only: once/sec, log how fast level.time & svs.time advance. At sv_fps 40 the
@@ -181,6 +319,17 @@ void cod1reloaded_apply_patches(void) {
         printf("%s version gate: min cod1reloaded=%d, build gate OFF "
                "(set COD1RELOADED_MIN_BUILD, e.g. 10602), allow_unversioned=%d\n",
                TAG, g_min_version, g_allow_unversioned);
+
+    if (g_auto) {
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, minbuild_thread, NULL) == 0) {
+            pthread_detach(tid);
+            printf("%s auto build gate: following %s (grace %dh, poll %dmin, "
+                   "state '%s')\n",
+                   TAG, g_auto_url, g_auto_grace_h, g_auto_poll_min, g_auto_state);
+            fflush(stdout);
+        }
+    }
 }
 
 int cod1reloaded_allow_connect(netadr_t from) {

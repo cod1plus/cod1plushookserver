@@ -46,7 +46,7 @@
  * The client draws the body this much further out than the engine lean; the box has to
  * follow it or the leaning player is visible but unhittable. */
 #define LEAN_BODY_SHIFT_SCALE        1.0f
-#define LEAN_BODY_SHIFT_RIGHT_SCALE  3.0f
+#define LEAN_BODY_SHIFT_RIGHT_SCALE  2.0f  /* = client body_shift_right_scale; MODULE DISABLED (bullet no-op + movement wall) - if ever re-enabled, note the client draws NO shift in crouch */
 
 #define GAME_SO_NAME           "game.mp.i386.so"
 

@@ -13,6 +13,7 @@ ${CC} -m32 -shared -fPIC -O2 -Wall -Wextra \
   "${ROOT_DIR}/src/cod1reloaded.c" \
   "${ROOT_DIR}/src/lean_hitbox.c" \
   "${ROOT_DIR}/src/perbone_hit.c" \
+  "${ROOT_DIR}/src/pose_sync.c" \
   "${ROOT_DIR}/src/antilag.c" \
   "${ROOT_DIR}/src/anim_clamp.c" \
   "${ROOT_DIR}/src/competitive_sv.c" \
