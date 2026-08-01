@@ -513,6 +513,27 @@ static int write_matchdata_cfg_from_json(const char *json, const char *path) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Strip surrounding quotes from a command-line value.
+ *
+ * The FPS orchestrator builds its command line WITHOUT a shell, so the quotes it
+ * writes around values survive into argv verbatim: `+match create "315313"` arrives
+ * as the literal 8-char string "315313" (quotes included), and `+set fs_homepath
+ * "/path"` likewise. The match id then never matches any match, and the stats log
+ * path resolves to nothing - the exact "No match config - log tailer idle" that was
+ * reported. A shell-launched server (./start.sh 99999) has no quotes, which is why
+ * it worked there and not here. Accept both forms. */
+static void strip_quotes(char *s) {
+    if (!s || !*s) return;
+    size_t len = strlen(s);
+    while (len > 0 && (s[len-1] == 0x22 || s[len-1] == 0x27 ||
+                       s[len-1] == 0x0d || s[len-1] == 0x0a || s[len-1] == 0x20)) {
+        s[--len] = 0;
+    }
+    size_t start = 0;
+    while (s[start] == 0x22 || s[start] == 0x27 || s[start] == 0x20) start++;
+    if (start) memmove(s, s + start, len - start + 1);
+}
+
 /* +match create {id} — parse match ID from /proc/self/cmdline         */
 /* ------------------------------------------------------------------ */
 
@@ -539,7 +560,8 @@ static int parse_cmdline_match_id(char *out, size_t sz) {
                 if (id_start < n && cmdline[id_start]) {
                     strncpy(out, &cmdline[id_start], sz - 1);
                     out[sz - 1] = 0;
-                    return 0;
+                    strip_quotes(out);
+                    return (out[0] != 0) ? 0 : -1;
                 }
             }
         }
@@ -564,6 +586,7 @@ static void parse_cmdline_fs_homepath(char *out, size_t sz) {
             if (val < n && cmdline[val]) {
                 strncpy(out, &cmdline[val], sz - 1);
                 out[sz - 1] = 0;
+                strip_quotes(out);
                 return;
             }
         }
@@ -590,6 +613,7 @@ static void parse_cmdline_fs_game(char *out, size_t sz) {
             if (val < n && cmdline[val]) {
                 strncpy(out, &cmdline[val], sz - 1);
                 out[sz - 1] = 0;
+                strip_quotes(out);
                 return;
             }
         }
