@@ -872,16 +872,48 @@ static void *uuid_collector_thread(void *arg) {
 
 /* Return the UUID for a player by name (from match config).
    If no config / no match → returns the name itself as fallback UUID. */
+/* Compare two player names the way a human would.
+ *
+ * Every association in this file - stats event -> match config, stats event ->
+ * connected slot - is keyed on the IN-GAME name, while the match config carries the
+ * FPSChallenge username. A CoD colour code (^1..^9), a clan tag spacing difference
+ * or a stray space is enough to make the exact comparison fail, and then the player
+ * is either dropped from the report (name found, uuid mismatch) or emitted with his
+ * NAME as uuid (name not found), which the backend cannot match. Either way he
+ * silently has no stats - one different player per match, exactly as reported in
+ * three consecutive 5v5s. Normalise before comparing: strip colour codes and all
+ * whitespace, fold case. */
+static void name_normalize(const char *in, char *out, size_t sz) {
+    size_t o = 0;
+    if (!in || !out || sz == 0) { if (out && sz) out[0] = 0; return; }
+    for (size_t i = 0; in[i] && o + 1 < sz; i++) {
+        unsigned char ch = (unsigned char)in[i];
+        if (ch == '^' && in[i+1]) { i++; continue; }   /* ^N colour code */
+        if (ch <= 0x20) continue;                      /* spaces / control */
+        out[o++] = (char)tolower(ch);
+    }
+    out[o] = 0;
+}
+
+static int name_eq(const char *a, const char *b) {
+    if (!a || !b) return 0;
+    if (strcasecmp(a, b) == 0) return 1;               /* fast path: exact */
+    char na[96], nb[96];
+    name_normalize(a, na, sizeof(na));
+    name_normalize(b, nb, sizeof(nb));
+    return (na[0] && strcmp(na, nb) == 0);
+}
+
 static const char *lookup_uuid(const match_config_t *c, const char *name) {
     /* First: live-captured login UUID by in-game name */
     for (int i = 0; i < g_sv_maxclients; i++) {
         if (g_client_name[i][0] && g_client_uuid[i][0] &&
-            strcasecmp(g_client_name[i], name) == 0)
+            name_eq(g_client_name[i], name))
             return g_client_uuid[i];
     }
     /* Second: match config by FPSChallenge username */
     for (int i = 0; i < c->num_players; i++)
-        if (strcasecmp(c->players[i].name, name) == 0)
+        if (name_eq(c->players[i].name, name))
             return c->players[i].uuid;
     return name; /* fallback */
 }
@@ -889,7 +921,7 @@ static const char *lookup_uuid(const match_config_t *c, const char *name) {
 static const char *expected_uuid_for_name(const match_config_t *c, const char *name) {
     if (!c || !c->loaded || !name || !*name) return NULL;
     for (int i = 0; i < c->num_players; i++) {
-        if (strcasecmp(c->players[i].name, name) == 0)
+        if (name_eq(c->players[i].name, name))
             return c->players[i].uuid;
     }
     return NULL;
@@ -898,7 +930,7 @@ static const char *expected_uuid_for_name(const match_config_t *c, const char *n
 static int client_uuid_status_for_name(const char *name) {
     if (!name || !*name) return -1;
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (g_client_name[i][0] && strcasecmp(g_client_name[i], name) == 0)
+        if (g_client_name[i][0] && name_eq(g_client_name[i], name))
             return g_client_uuid_status[i];
     }
     return -1;
@@ -913,7 +945,7 @@ static const char *lookup_team_label(const match_config_t *c,
 {
     /* Prefer explicit config mapping */
     for (int i = 0; i < c->num_players; i++) {
-        if (strcasecmp(c->players[i].name, name) == 0)
+        if (name_eq(c->players[i].name, name))
             return c->players[i].team == 1 ? "team1" : "team2";
     }
 
