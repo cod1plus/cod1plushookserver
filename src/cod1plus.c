@@ -927,6 +927,9 @@ static const char *expected_uuid_for_name(const match_config_t *c, const char *n
     return NULL;
 }
 
+/* Kept for diagnostics: 1 = login matches the roster entry for this name,
+ * 0 = it does not, -1 = unknown. No longer gates the report. */
+__attribute__((unused))
 static int client_uuid_status_for_name(const char *name) {
     if (!name || !*name) return -1;
     for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -943,7 +946,16 @@ static const char *lookup_team_label(const match_config_t *c,
                                      const char *gsc_team,
                                      int team1_is_allies)
 {
-    /* Prefer explicit config mapping */
+    /* Prefer the LOGIN uuid: it is the only identity the player actually proves.
+     * In-game names are free text - a player may use a nick that has nothing to do
+     * with his FPSChallenge username, which is common and perfectly legitimate. */
+    const char *login = lookup_uuid(c, name);
+    if (login && login[0] && strcmp(login, name) != 0) {
+        for (int i = 0; i < c->num_players; i++)
+            if (c->players[i].uuid[0] && strcmp(c->players[i].uuid, login) == 0)
+                return c->players[i].team == 1 ? "team1" : "team2";
+    }
+    /* then the config name, for a client that never sent a login */
     for (int i = 0; i < c->num_players; i++) {
         if (name_eq(c->players[i].name, name))
             return c->players[i].team == 1 ? "team1" : "team2";
@@ -1058,14 +1070,8 @@ static int build_payload(const match_config_t *c,
     }
 
     /* Begin JSON */
-    int players_count = 0;
-    for (int i = 0; i < ev->num_players; i++) {
-        const event_player_t *ep = &ev->players[i];
-        const char *expected = expected_uuid_for_name(c, ep->name);
-        int status = expected ? client_uuid_status_for_name(ep->name) : -1;
-        if (expected && status == 0) continue;
-        players_count++;
-    }
+    /* Every player in the event is reported - see the note on the emit loop. */
+    const int players_count = ev->num_players;
 
     int pos = snprintf(out, out_sz,
         "{"
@@ -1108,9 +1114,13 @@ static int build_payload(const match_config_t *c,
     int emitted_players = 0;
     for (int i = 0; i < ev->num_players && pos < (int)out_sz - 256; i++) {
         const event_player_t *ep = &ev->players[i];
-        const char *expected   = expected_uuid_for_name(c, ep->name);
-        int status             = expected ? client_uuid_status_for_name(ep->name) : -1;
-        if (expected && status == 0) continue;
+        /* NEVER drop a player from the report. This used to skip anyone whose
+         * in-game name matched a config entry while his login uuid did not, as an
+         * anti-impersonation guard - but names are free text and a legitimate
+         * player using an unrelated nick was silently erased from the stats (one
+         * different player per 5v5, three matches running). Identity comes from the
+         * login uuid, which is emitted below; the backend decides what to do with a
+         * player it cannot resolve. The mismatch is still logged at connect time. */
         const char *uuid       = lookup_uuid(c, ep->name);
         const char *team_label = lookup_team_label(c, ep->name, ep->team,
                                                    team1_is_allies);
