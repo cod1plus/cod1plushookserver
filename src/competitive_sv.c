@@ -46,7 +46,14 @@
 #define TAG "[competitive]"
 #define GAME_SO_NAME "game.mp.i386.so"
 #define CVAR_SYSTEMINFO 0x08
-#define SPEC_MAX 512
+/* The engine rejects any cvar value longer than MAX_CVAR_VALUE_STRING (256) with a
+ * Com_Error that SHUTS THE SERVER DOWN on the next map change - hit live with a
+ * 375-char spec. So the spec is split across several SYSTEMINFO cvars
+ * (sv_competitive, sv_competitive2, ...), each kept well under the limit and cut
+ * only at entry boundaries. The client concatenates them back before parsing. */
+#define SPEC_MAX     1024   /* full spec, server side */
+#define CHUNK_MAX     220   /* per-cvar payload, safely under 256 */
+#define SPEC_CHUNKS     4   /* -> ~880 chars, roughly 45 cvars */
 
 /* game.mp.i386.so RVAs (from .dynsym, md5 343f99cd...) */
 #define RVA_G_RUNFRAME         0x0505f5
@@ -100,7 +107,29 @@ static void build_spec(char* out, size_t outsz) {
     fclose(f);
 }
 
-/* GAME thread: ensure the cvar exists as SYSTEMINFO, then push the staged spec. */
+/* Name of chunk i: "sv_competitive", "sv_competitive2", ... */
+static void chunk_name(int i, char* out, size_t n) {
+    if (i == 0) snprintf(out, n, "sv_competitive");
+    else        snprintf(out, n, "sv_competitive%d", i + 1);
+}
+
+/* Copy at most CHUNK_MAX chars of `src` into `dst`, cutting on a space so an entry
+ * is never split in half. Returns how many chars were consumed. */
+static size_t chunk_take(const char* src, char* dst, size_t dstsz) {
+    size_t len = strlen(src);
+    if (len > CHUNK_MAX) {
+        len = CHUNK_MAX;
+        while (len > 0 && src[len] != ' ') len--;   /* back up to a boundary */
+        if (len == 0) len = CHUNK_MAX;              /* single huge entry: hard cut */
+    }
+    if (len >= dstsz) len = dstsz - 1;
+    memcpy(dst, src, len);
+    dst[len] = 0;
+    while (src[len] == ' ') len++;                  /* swallow the separator */
+    return len;
+}
+
+/* GAME thread: ensure the cvars exist as SYSTEMINFO, then push the staged spec. */
 static void publish_if_dirty(void) {
     if (!g_base) return;
 
@@ -108,9 +137,14 @@ static void publish_if_dirty(void) {
         g_registered = 1;
         trap_cvar_register_t reg =
             (trap_cvar_register_t)(g_base + RVA_TRAP_CVAR_REGISTER);
-        reg(g_vmcvar, "sv_competitive", "", CVAR_SYSTEMINFO);  /* create + flag */
-        g_dirty = 1;                                            /* force first push */
-        printf("%s sv_competitive registered as SYSTEMINFO (broadcast to clients)\n", TAG);
+        for (int i = 0; i < SPEC_CHUNKS; i++) {
+            char nm[32];
+            chunk_name(i, nm, sizeof(nm));
+            reg(g_vmcvar, nm, "", CVAR_SYSTEMINFO);   /* create + flag */
+        }
+        g_dirty = 1;                                  /* force first push */
+        printf("%s sv_competitive registered as SYSTEMINFO in %d parts "
+               "(broadcast to clients)\n", TAG, SPEC_CHUNKS);
         fflush(stdout);
     }
 
@@ -119,9 +153,27 @@ static void publish_if_dirty(void) {
         memcpy(spec, g_spec_pending, sizeof(spec));   /* snapshot the staged spec */
         spec[SPEC_MAX - 1] = 0;
         g_dirty = 0;
+
         trap_cvar_set_t set = (trap_cvar_set_t)(g_base + RVA_TRAP_CVAR_SET);
-        set("sv_competitive", spec);                  /* SYSTEMINFO -> rebuilt+pushed */
-        printf("%s published spec to clients: \"%s\"\n", TAG, spec[0] ? spec : "(empty)");
+        const char* p = spec;
+        int used = 0;
+        for (int i = 0; i < SPEC_CHUNKS; i++) {
+            char nm[32], part[CHUNK_MAX + 1];
+            chunk_name(i, nm, sizeof(nm));
+            if (*p) {
+                p += chunk_take(p, part, sizeof(part));
+                used++;
+            } else {
+                part[0] = 0;                          /* clear the unused tail */
+            }
+            set(nm, part);
+        }
+        if (*p) {
+            printf("%s WARNING: competitive.cfg is too long, the tail was dropped "
+                   "(max ~%d chars): \"%s\"\n", TAG, CHUNK_MAX * SPEC_CHUNKS, p);
+        }
+        printf("%s published spec to clients in %d part(s): \"%s\"\n",
+               TAG, used, spec[0] ? spec : "(empty)");
         fflush(stdout);
     }
 }

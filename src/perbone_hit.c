@@ -25,7 +25,32 @@
  * ear and the shoulder) and broke in crouch/prone. Body zones stay height-based.
  *
  * MODES (env COD1RELOADED_PERBONE_HIT): unset/off = not installed; dump = probe
- * + log (no override); 1/on = full override.
+ * + log (no override); 1/on = full override; grant = ADD-ONLY (see below).
+ *
+ * ---- grant mode (COD1RELOADED_PERBONE_HIT=grant) - the tournament-safe subset --
+ * The shipping bug is one-directional: our CLIENT draws a leaning body ~5u further
+ * out than the server poses it (lean_fix.cpp:152-163 shifts tag_origin; the server
+ * has no such term), so a bullet aimed at the DRAWN head passes ~5u outboard of the
+ * tested skull and the engine answers ENTITYNUM_WORLD. Measured live three times,
+ * both sides: visible head -> ehit=1022, same head 5u inboard -> hitloc=2.
+ *
+ * grant mode fixes exactly that and nothing else:
+ *   - it NEVER rejects, downgrades or re-locates an engine hit. If the engine
+ *     returned any entity at all (player OR world entity < ENTITYNUM_WORLD) the
+ *     trace is returned byte-identical. Pure addition; the "box hit but no bone"
+ *     reject path that ate bullets in mode 1 is unreachable.
+ *   - it never touches engine state before the engine's own trace runs, so the
+ *     engine's verdict cannot be perturbed (mode 1/3 pre-pose the leaners, which
+ *     changes what the engine itself tests).
+ *   - it acts ONLY on the single trap_LocationalTrace call inside
+ *     Bullet_Fire_Extended (checked by return address, RVA 0x6e0b5). CanDamage,
+ *     G_CheckForPreventFriendlyFire, G_MissileTrace, Weapon_Melee and the turret
+ *     all call the same trap while a bullet is in flight; mode 1 rewrites those
+ *     too, which can block friendly fire or splash. grant mode cannot.
+ *   - STAND + alive + leaning + not-the-shooter only, bounded by the engine's own
+ *     stop point (clamped onto the ray), with a 64u broad-phase reject.
+ * Tuning: COD1RELOADED_PERBONE_GRANT_MAXDIST (64), _GRANT_STANDONLY (1),
+ *         _GRANT_MINENT (1022), plus the shift/radius knobs below.
  * Tuning: COD1RELOADED_PERBONE_RADIUS (body sphere, default 6.0),
  *         COD1RELOADED_PERBONE_HEADRAD (head sphere, default 6.0),
  *         COD1RELOADED_PERBONE_NECKRAD (neck sphere, default 5.0),
@@ -59,6 +84,19 @@
 #define RVA_AddLeanToPosition 0x71a7c  /* void(float* pos, float yaw, float leanf, float, float) */
 #define RVA_g_entities        0x21d6c0 /* gentity_t array base (.bss) */
 
+/* The ONE trap_LocationalTrace call that is a real bullet: Bullet_Fire_Extended
+ * (0x6dffc) + 0xb4. Disassembled from this exact .so:
+ *     0x6e0b0  e8 ab 52 fa ff   call 0x13360 <trap_LocationalTrace@plt>
+ *     0x6e0b5  <- the return address our hook sees
+ * grant mode compares __builtin_return_address(0) against it, so the eight OTHER
+ * callers (CanDamage x2, G_CheckForPreventFriendlyFire x2, turret_think_init,
+ * G_MissileTrace, Weapon_Melee, + one unnamed) are provably never rewritten -
+ * several of them run INSIDE G_Damage, i.e. while a bullet is in flight, so the
+ * g_bullet_in_flight flag alone does not separate them. */
+#define RVA_BULLET_TRACE_CALL 0x6e0b0
+#define RVA_BULLET_TRACE_RET  0x6e0b5
+static const unsigned char BULLET_TRACE_BYTES[5] = { 0xe8, 0xab, 0x52, 0xfa, 0xff };
+
 /* trap_LocationalTrace prologue: push ebp; mov ebp,esp; push ebx; sub $0x24,esp */
 static const unsigned char LT_PROLOGUE[7] = { 0x55, 0x89, 0xe5, 0x53, 0x83, 0xec, 0x24 };
 #define LT_PATCHLEN 7
@@ -74,12 +112,25 @@ static const unsigned char LT_PROLOGUE[7] = { 0x55, 0x89, 0xe5, 0x53, 0x83, 0xec
 #define E_ORIGIN      0x138   /* r.currentOrigin vec3 */
 #define GENTITY_SIZE  0x31c
 #define E_HEALTH      0x238   /* int; the dead keep a client ptr + stale leanf */
+#define E_TAKEDAMAGE  0x175   /* byte; the engine's OWN gate - Bullet_Fire_Extended
+                               * @0x6e4d1 `cmp byte [ent+0x175],0; je end` refuses to
+                               * call G_Damage without it. Spectators and warmup-
+                               * protected players have it 0 while still owning a
+                               * client pointer, positive health and a stale leanf. */
 #define PS_LEANF      0x40
 #define PS_VIEWYAW    0xc4
 
-#define ENTITYNUM_NONE 0x3ff
+#define ENTITYNUM_NONE  0x3ff
+#define ENTITYNUM_WORLD 0x3fe
 #define PB_MAX_CLIENTS 64
 #define PB_MAX_BONES   160
+
+/* g_mode values. 4 = grant (add-only), see the header comment. */
+#define PB_MODE_OFF    0
+#define PB_MODE_FULL   1
+#define PB_MODE_DUMP   2
+#define PB_MODE_POSE   3
+#define PB_MODE_GRANT  4
 
 /* ---- hitloc group ids ---- */
 enum {
@@ -105,8 +156,14 @@ typedef struct {
     float    fraction;     /* +0x00 */
     float    endpos[3];    /* +0x04 */
     float    normal[3];    /* +0x10 */
-    int32_t  surfaceFlags; /* +0x1c */
-    int32_t  _pad20, _pad24;
+    int32_t  surfaceFlags; /* +0x1c; Bullet_Fire_Extended tests &4 (SURF_NOIMPACT) but
+                            * only for NON-client hits - a granted player hit never
+                            * reaches that branch, so the wall's flags are harmless. */
+    int32_t  passthrough;  /* +0x20; Bullet_Fire_Extended @0x6e386: `and eax,0x10` ->
+                            * if set the bullet PENETRATES (recurse, no G_Damage)
+                            * instead of damaging tr.hitEntityNum. A granted hit must
+                            * clear that bit or the damage is silently skipped. */
+    int32_t  _pad24;       /* +0x24; never read on the bullet path */
     uint16_t hitEntityNum; /* +0x28 */
     uint16_t _pad2a;
     uint16_t hitLocation;  /* +0x2c */
@@ -207,6 +264,25 @@ static float g_reject_margin = 3.0f;   /* VALIDATED: 5.0 granted hits in open ai
                                         * to a leaner, 1.5 deleted legitimate grazes. */
 static int    g_in_trace = 0;
 static time_t g_last_dump = 0;   /* dump-mode throttle: re-dump the pose 1/2s */
+
+/* ---- grant mode ---- */
+/* Return address of the bullet trace, resolved and byte-verified at install.
+ * 0 = not verified => grant mode refuses to install at all (fail to no-op). */
+static uintptr_t g_bullet_ret = 0;
+/* Broad phase: a leaner whose box centre is farther than this from the bullet
+ * segment is skipped without posing him. Half a player box diagonal is ~42u, the
+ * lean carries the head ~16u further and the head capsule adds ~6 => 64 is
+ * generous. Also makes a cross-map grant structurally impossible. */
+static float g_grant_maxdist = 64.0f;
+/* STAND only. The client's crouch shift rows are dead code (the engine zeroes all
+ * 24 lean controllers when crouched, cgame 0x496e), so a crouched leaner is drawn
+ * where he is posed and needs no grant; mirroring a crouch shift once produced
+ * "hitbox too big". Prone is excluded for free by the same height gate. */
+static int   g_grant_standonly = 1;
+/* Only these engine answers may be upgraded: ENTITYNUM_WORLD (1022) and
+ * ENTITYNUM_NONE (1023), i.e. "the bullet hit no entity at all". Anything the
+ * engine did attribute to an entity is left untouched. */
+static int   g_grant_minent = ENTITYNUM_WORLD;
 
 /* ============================== math ============================== */
 static inline float dot3(const float* a, const float* b) {
@@ -344,6 +420,59 @@ static void compute_lean(void* ent, void* cl, float out[3])
     float leanf = *(float*)((char*)cl + PS_LEANF);
     if (leanf == 0.0f) return;
     float yaw = *(float*)((char*)cl + PS_VIEWYAW);
+
+    if (g_mode == PB_MODE_GRANT) {
+        /* GRANT MODE: a LITERAL transcription of the client's drawn shift, with no
+         * empirically fitted term in it. lean_fix.cpp:152-163 does
+         *     cbuf[22] += -lf * K * body_shift_lean_scale
+         * where cbuf[22] is tag_origin_offset[1] (model frame, +Y = the player's
+         * LEFT) and K = 5.0 on a left lean, 2.5 * body_shift_right_scale(2.0) = 5.0
+         * on a right lean. lf is the client's fLeanFrac, ps.leanf/0.5 server-side
+         * (full lean measured at +-0.5). So: |shift| = K * |leanf| / 0.5, toward the
+         * side the player leans to, along the model's lateral axis.
+         *
+         * CORRECTED 2026-08-11: lf is NOT leanf/0.5. The client's lf is
+         * cbuf[20]/3.75, and the shared BG code writes cbuf[20] = fLeanFrac*3.75, so
+         * lf == fLeanFrac == GetLeanFraction(leanf) = (2-|leanf|)*leanf  (game
+         * 0x71a17). PM_UpdateLean clamps leanf to +-0.5, so a FULL lean gives
+         * lf = 0.75, not 1.0 - and leanf/0.5 over-shifted by 33% (5.0u granted where
+         * the client draws 3.75u), putting the granted volume ~1.25u beyond the
+         * visible head. The curve also matters mid-lean: it is an ease, not a ramp.
+         *
+         * The lateral axis is taken from the VIEW yaw: our client's swing_fix locks
+         * the drawn torso to the view (tolerance 0, speed 1.0) and sync_force_and_pose
+         * puts the server's swing there too for the duration of this test, so the two
+         * frames coincide. Same expression as the ENG debug line below, which was
+         * written straight from the client source. */
+        const float r   = yaw * 0.01745329252f;
+        const float K   = (leanf < 0.0f) ? g_shift_sl : g_shift_sr;
+        const float al  = leanf < 0.0f ? -leanf : leanf;
+        const float lf  = (2.0f - al) * leanf;      /* GetLeanFraction, game 0x71a17 */
+        const float amt = -lf * K;                  /* + = toward the player's LEFT */
+        out[0] = -sinf(r) * amt;                    /* left  = (-sin yaw, cos yaw) */
+        out[1] =  cosf(r) * amt;
+        out[2] = 0.0f;
+        /* SIGN GUARD. Everything above rides on "ps.leanf < 0 == leaning left",
+         * which is consistent across the client, pose_sync and this file but was
+         * never proven from the binary. The posed skeleton settles it per shot with
+         * no convention at all: the server's own pose bends TOWARD the lean side
+         * (head measured 11u off the feet axis at leanf 0.5), so if our offset
+         * points away from the posed head we had the sign backwards - flip it.
+         * Without this, an inverted convention would place a 5u volume on the wrong
+         * side of the victim, i.e. grant hits in open air. */
+        {
+            float hm[16];
+            const float* org0 = (const float*)((const char*)ent + E_ORIGIN);
+            if (p_WorldTag(ent, "Bip01 Head", hm)) {
+                const float dx = hm[12] - org0[0], dy = hm[13] - org0[1];
+                if (dx*dx + dy*dy > 4.0f && (dx*out[0] + dy*out[1]) < 0.0f) {
+                    out[0] = -out[0];
+                    out[1] = -out[1];
+                }
+            }
+        }
+        return;
+    }
 
     /* DIRECTION READ FROM THE POSE ITSELF, not from p_AddLean. Measured live: with
      * the p_AddLean direction the mirror pushed the capsule the WRONG WAY on a left
@@ -772,7 +901,9 @@ static char* ci_of(int i)
 /* Fresh-pose every leaning player (the engine never poses in normal play - the
  * per-frame G_DObjCalcPose is gated behind the debug dvar g_debugLocDamage,
  * je @0x3b2b5), with the swing yaw forced to the view for STANDING leaners. */
-static void sync_force_and_pose(void)
+/* do_pose=0: force the swing yaw but skip the G_DObjCalcPose - grant mode poses
+ * each candidate itself inside perbone_test, so the extra pass is pure cost. */
+static void sync_force_and_pose(int do_pose)
 {
     for (int i = 0; i < PB_MAX_CLIENTS; ++i) {
         char* ge = (char*)(g_base + RVA_g_entities) + (size_t)i * GENTITY_SIZE;
@@ -795,7 +926,7 @@ static void sync_force_and_pose(void)
                 }
             }
         }
-        p_CalcPose(ge);
+        if (do_pose) p_CalcPose(ge);
     }
 }
 
@@ -811,9 +942,121 @@ static void sync_restore(void)
     }
 }
 
+/* ======================= grant mode (add-only) ========================
+ * Deliberately a SEPARATE function from the mode-1 path below rather than a flag
+ * threaded through it: mode 1 keeps a reject branch that has eaten legitimate
+ * bullets live, and the point of this mode is that no edit to it can ever reach
+ * that branch. The duplication is the safety property.
+ * ====================================================================== */
+
+/* Cheap broad phase: distance from the player's box centre to the bullet segment. */
+static int grant_near(const char* ge, const float* start, const float* end)
+{
+    const float* org = (const float*)(ge + E_ORIGIN);
+    const float* mns = (const float*)(ge + E_MINS);
+    const float* mxs = (const float*)(ge + E_MAXS);
+    const float  c[3] = { org[0], org[1], org[2] + (mns[2] + mxs[2]) * 0.5f };
+    float t;
+    return pt_seg_dist2(c, start, end, &t) <= g_grant_maxdist * g_grant_maxdist;
+}
+
+static void grant_pass(pb_trace_t* tr, const float* start, const float* end,
+                       int passEnt, int bullet_call)
+{
+    /* (1) only the real bullet trace, identified by its call site */
+    if (!bullet_call) return;
+    /* (2) only a total miss may be upgraded - never re-attribute an engine hit */
+    if ((int)tr->hitEntityNum < g_grant_minent) return;
+
+    const float d[3] = { end[0]-start[0], end[1]-start[1], end[2]-start[2] };
+    const float L2 = d[0]*d[0] + d[1]*d[1] + d[2]*d[2];
+    if (L2 < 1.0f) return;          /* degenerate probe, not a bullet ray */
+
+    /* (3) walls still protect: project the engine's stop point back onto the ray
+     * and never test past it. Projecting (instead of using endpos verbatim) makes
+     * the test segment a prefix of the bullet by construction, whatever the engine
+     * wrote there, and folds NaN to 0 through the negated comparison. */
+    float f_stop = ((tr->endpos[0]-start[0])*d[0] + (tr->endpos[1]-start[1])*d[1]
+                  + (tr->endpos[2]-start[2])*d[2]) / L2;
+    if (!(f_stop > 0.0f)) return;
+    if (f_stop > 1.0f) f_stop = 1.0f;
+    const float seg_end[3] = { start[0] + d[0]*f_stop,
+                               start[1] + d[1]*f_stop,
+                               start[2] + d[2]*f_stop };
+
+    float bestf = 2.0f, besthp[3] = { 0.0f, 0.0f, 0.0f };
+    int   besti = -1, besthl = HL_NONE;
+
+    g_in_trace = 1;                 /* re-entrancy guard for the whole scan */
+    sync_force_and_pose(0);         /* swing yaw only; rolled back by the wrapper */
+    for (int i = 0; i < PB_MAX_CLIENTS; ++i) {
+        /* NEVER the shooter: his own posed skull sits beside the muzzle when he
+         * leans, so without this a leaning shooter instakills himself at
+         * fraction 0. passEnt is his entity NUMBER (Bullet_Fire_Extended passes
+         * *(int*)shooter, disasm 0x6e093). */
+        if (i == passEnt) continue;
+        char* ge = (char*)(g_base + RVA_g_entities) + (size_t)i * GENTITY_SIZE;
+        void* c  = *(void**)(ge + E_CLIENT);
+        if (!c) continue;                                   /* not a player slot  */
+        if (*(int*)(ge + E_HEALTH) <= 0) continue;          /* the dead grant none */
+        /* the engine's own damageability gate: without it a granted hit is dropped
+         * by Bullet_Fire_Extended anyway, and we would have deleted the wall impact
+         * for nothing - or attributed the shot to a spectator carrying a stale leanf */
+        if (*(unsigned char*)(ge + E_TAKEDAMAGE) == 0) continue;
+        if (*(float*)((char*)c + PS_LEANF) == 0.0f) continue; /* not leaning       */
+        {   /* stance gate: STAND only by default (crouch is already consistent,
+             * prone puts every bone within ~6u of the ground and turns any skim
+             * into a headshot) */
+            const float* mns = (const float*)(ge + E_MINS);
+            const float* mxs = (const float*)(ge + E_MAXS);
+            const float  h   = mxs[2] - mns[2];
+            if (h < (g_grant_standonly ? 55.0f : 30.0f)) continue;
+        }
+        if (!grant_near(ge, start, seg_end)) continue;
+
+        float hp[3] = { seg_end[0], seg_end[1], seg_end[2] };
+        float clr = 1e9f;
+        const int hl = perbone_test(ge, c, start, seg_end, hp, &clr);
+        if (hl == HL_NONE) continue;
+
+        float f = ((hp[0]-start[0])*d[0] + (hp[1]-start[1])*d[1]
+                 + (hp[2]-start[2])*d[2]) / L2;
+        if (f < 0.0f)      f = 0.0f;
+        if (f > f_stop)    f = f_stop;
+        if (f < bestf) {
+            bestf = f; besti = i; besthl = hl;
+            besthp[0]=hp[0]; besthp[1]=hp[1]; besthp[2]=hp[2];
+        }
+    }
+    g_in_trace = 0;
+
+    if (besti < 0) return;
+    /* G_DamageClient does `damage *= g_fHitLocDamageMult[hitLocation]` with NO
+     * bounds check (0x47184) and that table is exactly 76 bytes = 19 floats, so a
+     * hitloc outside 0..18 is an out-of-bounds read. perbone_test cannot produce
+     * one today; this makes it structurally impossible. */
+    if (besthl <= HL_NONE || besthl > HL_GUN) return;
+
+    tr->hitEntityNum = (uint16_t)besti;
+    tr->hitLocation  = (uint16_t)besthl;
+    tr->fraction     = bestf;
+    tr->endpos[0] = besthp[0]; tr->endpos[1] = besthp[1]; tr->endpos[2] = besthp[2];
+    /* the wall we replaced may have been a penetrable surface; leaving that bit set
+     * sends the engine down the "shoot through" recursion instead of G_Damage and
+     * the granted hit would deal no damage at all (0x6e386). */
+    tr->passthrough &= ~0x10;
+
+    if (g_debug) {
+        printf("%s GRANT ent=%d hitloc=%d frac=%.2f endpos=(%.1f %.1f %.1f) "
+               "[engine said no entity]\n",
+               TAG, besti, besthl, bestf, besthp[0], besthp[1], besthp[2]);
+        fflush(stdout);
+    }
+}
+
 /* ============================== the hook ============================== */
 static void hook_lt_body(pb_trace_t* tr, const float* start, const float* end,
-                                 int passEnt, int mask, int sight)
+                                 int passEnt, int mask, int sight, uintptr_t caller)
 {
     /* Only act on REAL bullets. The game calls trap_LocationalTrace every frame
      * for sight/crosshair probes too; treating those as shots produced a storm of
@@ -821,41 +1064,72 @@ static void hook_lt_body(pb_trace_t* tr, const float* start, const float* end,
      * always-installed Bullet_Fire hook. */
     extern int g_bullet_in_flight;
     const int is_bullet = (g_bullet_in_flight > 0);
+    const int is_grant  = (g_mode == PB_MODE_GRANT);
+    /* grant mode does NOT use g_bullet_in_flight: that flag is also set while
+     * G_Damage's own traces run, and it is 0 entirely when COD1RELOADED_ANTILAG=0
+     * (the counter lives in antilag.c). The call site is exact and dependency-free. */
+    const int bullet_call = (g_bullet_ret != 0 && caller == g_bullet_ret);
 
-    if (!g_in_trace && is_bullet)
-        sync_force_and_pose();
+    /* grant mode touches NOTHING before the engine speaks - not even the swing
+     * state - so the engine's own verdict is provably the vanilla one. */
+    if (!g_in_trace && is_bullet && !is_grant)
+        sync_force_and_pose(1);
 
     real_loctrace(tr, start, end, passEnt, mask, sight);   /* engine per-part trace */
 
     if (g_in_trace) return;
+    if (is_grant) { grant_pass(tr, start, end, passEnt, bullet_call); return; }
     if (!is_bullet) return;   /* sight/crosshair probes: engine answer untouched */
-    if (g_mode == 3) {
-        /* pose-only: the engine's answer IS the answer. With DEBUG, expose it - all
-         * night we only ever logged perbone's OWN verdicts, never the engine's. This
-         * line is the ground truth: what the per-part clipper says about a bullet at a
-         * leaning player, with the skeleton freshly posed. */
+    if (g_mode == 3 || g_mode == 2) {
+        /* Ground truth for BOTH observe modes: the ENGINE's verdict (entity +
+         * hitLocation + impact point) for every bullet near a leaning player, hit or
+         * miss. Until 2026-08-10 dump mode never logged this - the hl/hitloc in its
+         * DBG lines are PERBONE'S simulation, and a whole session was mis-read as
+         * engine behaviour because of it. This line is the engine speaking. */
         if (g_debug) {
-            /* Log EVERY shot that passes near a leaning player - including total
-             * misses. The first instrument only printed when the trace HIT the
-             * player, which made the interesting shots (aimed at the drawn head,
-             * engine says world-miss) invisible. Distance is bullet-ray to the
-             * freshly-posed head bone; ehit=1023 means the engine hit nothing. */
-            static time_t last_eng = 0;
-            time_t now = time(NULL);
-            if (now != last_eng) {
+            /* Log EVERY bullet near a leaning player - hits AND misses.
+             *
+             * Two flaws of the first version, both found by reading its own 2026-08-10
+             * output, are fixed here:
+             *  1. It measured the distance to the head BONE POINT. The bone sits at the
+             *     BASE of the skull and the volume extends ~8u upward, so every genuine
+             *     upper-skull hit reported "headmiss=5..7" and looked like an anomaly.
+             *     Measure against the AXIS (bone -> crown), like the engine's own part.
+             *  2. It measured the nearest LEANING player, which is not necessarily the
+             *     entity the engine hit (a 2026-08-10 line shows target=0 ehit=1, i.e.
+             *     head numbers for a different player than the one shot). Prefer the
+             *     entity the engine actually hit.
+             * Also prints `drawn`: the same head displaced by the CLIENT body shift, so
+             * a single line shows both what the server tests and what the shooter saw.
+             * No rate limit: one line per bullet, and a counter to correlate with chat. */
+            {
+                static long shotno = 0;
                 float best = 1e9f, bh[3] = {0,0,0}, blf = 0.0f, bor[2] = {0,0};
                 int   bent = -1;
+                const int ehit = (int)tr->hitEntityNum;
                 for (int i = 0; i < PB_MAX_CLIENTS; ++i) {
                     char* ge = (char*)(g_base + RVA_g_entities) + (size_t)i * GENTITY_SIZE;
                     void* c  = *(void**)(ge + E_CLIENT);
                     if (!c) continue;
                     float lf = *(float*)((char*)c + PS_LEANF);
                     if (lf == 0.0f) continue;
-                    float hm[16];
+                    float hm[16], nm[16];
                     if (!p_WorldTag(ge, "Bip01 Head", hm)) continue;
-                    float t;
-                    float d = sqrtf(pt_seg_dist2(&hm[12], start, end, &t));
-                    if (d < best) {
+                    /* head axis: bone -> crown, along bone-minus-neck when available */
+                    float up[3] = { 0.0f, 0.0f, 1.0f };
+                    if (p_WorldTag(ge, "Bip01 Neck", nm)) {
+                        up[0]=hm[12]-nm[12]; up[1]=hm[13]-nm[13]; up[2]=hm[14]-nm[14];
+                        float L = sqrtf(dot3(up, up));
+                        if (L > 1e-3f) { up[0]/=L; up[1]/=L; up[2]/=L; }
+                        else { up[0]=0.0f; up[1]=0.0f; up[2]=1.0f; }
+                    }
+                    float crown[3] = { hm[12]+up[0]*g_head_len,
+                                       hm[13]+up[1]*g_head_len,
+                                       hm[14]+up[2]*g_head_len };
+                    float t, cp[3];
+                    float d = sqrtf(seg_seg_dist2(start, end, &hm[12], crown, &t, cp));
+                    /* the entity the engine hit always wins the selection */
+                    if ((i == ehit && bent != ehit) || (bent != ehit && d < best)) {
                         best = d; bent = i; blf = lf;
                         bh[0]=hm[12]; bh[1]=hm[13]; bh[2]=hm[14];
                         float* o = (float*)(ge + E_ORIGIN);
@@ -863,18 +1137,27 @@ static void hook_lt_body(pb_trace_t* tr, const float* start, const float* end,
                     }
                 }
                 if (bent >= 0 && best < 40.0f) {
-                    last_eng = now;
-                    printf("%s ENG leanf=%.2f target=%d ehit=%d hitloc=%d "
+                    /* where the CLIENT draws that head: same bone + the lean body shift
+                     * (lean_fix.cpp:154, stand). Lateral axis = the player's right. */
+                    char* ge = (char*)(g_base + RVA_g_entities) + (size_t)bent * GENTITY_SIZE;
+                    void* c  = *(void**)(ge + E_CLIENT);
+                    float yaw = c ? *(float*)((char*)c + PS_VIEWYAW) : 0.0f;
+                    const float r = yaw * 0.01745329252f;
+                    const float K = (blf < 0.0f) ? 5.0f : 5.0f;   /* 2.5 * right_scale 2 */
+                    const float amt = -(blf / 0.5f) * K;
+                    float dx = -sinf(r) * amt, dy = cosf(r) * amt;
+                    printf("%s ENG#%ld leanf=%.2f target=%d ehit=%d hitloc=%d "
                            "endpos=(%.1f %.1f %.1f) head=(%.1f %.1f %.1f) "
-                           "org=(%.1f %.1f) headmiss=%.1f\n",
-                           TAG, blf, bent, (int)tr->hitEntityNum, (int)tr->hitLocation,
+                           "drawn=(%.1f %.1f) org=(%.1f %.1f) axismiss=%.1f\n",
+                           TAG, ++shotno, blf, bent, ehit, (int)tr->hitLocation,
                            tr->endpos[0], tr->endpos[1], tr->endpos[2],
-                           bh[0], bh[1], bh[2], bor[0], bor[1], best);
+                           bh[0], bh[1], bh[2], bh[0]+dx, bh[1]+dy,
+                           bor[0], bor[1], best);
                     fflush(stdout);
                 }
             }
         }
-        return;
+        if (g_mode == 3) return;   /* pose-only: the engine's answer IS the answer */
     }
 
     /* Point traces (start==end) are existence/visibility probes, not bullets - there is
@@ -1034,10 +1317,16 @@ static void hook_lt_body(pb_trace_t* tr, const float* start, const float* end,
 /* Wrapper: whatever path the body returns through, the forced swing state is
  * rolled back before the engine continues - nothing can leak into the networked
  * pose or a later frame. */
+__attribute__((noinline))
 static void Hook_LocationalTrace(pb_trace_t* tr, const float* start, const float* end,
                                  int passEnt, int mask, int sight)
 {
-    hook_lt_body(tr, start, end, passEnt, mask, sight);
+    /* The detour is a JMP planted on trap_LocationalTrace's first byte, so the
+     * stack here is untouched function-entry state and [esp] is the return address
+     * of the ORIGINAL caller inside game.mp.i386.so. That is what identifies the
+     * bullet trace among the nine callers of this trap. */
+    const uintptr_t caller = (uintptr_t)__builtin_return_address(0);
+    hook_lt_body(tr, start, end, passEnt, mask, sight, caller);
     /* Never let a (future) nested invocation roll back the OUTER trace's forced
      * state mid-flight - today no nesting exists (disasm-proven: nothing on the
      * pose path reaches trap_LocationalTrace), this is hardening (audit MED-4). */
@@ -1089,6 +1378,32 @@ static void try_install(void)
         return;
     }
 
+    /* Locate + byte-verify the bullet trace call site. In grant mode this is a hard
+     * requirement: without it we cannot tell a bullet from a friendly-fire probe, so
+     * a mismatched build must leave the module completely uninstalled rather than
+     * act on the wrong traces. */
+    {
+        static int bt_logged = 0;
+        const unsigned char* bt = (const unsigned char*)(base + RVA_BULLET_TRACE_CALL);
+        if (memcmp(bt, BULLET_TRACE_BYTES, sizeof(BULLET_TRACE_BYTES)) == 0) {
+            g_bullet_ret = base + RVA_BULLET_TRACE_RET;
+        } else {
+            g_bullet_ret = 0;
+            if (g_mode == PB_MODE_GRANT) {
+                if (!bt_logged) {
+                    bt_logged = 1;
+                    printf("%s Bullet_Fire_Extended trace call site mismatch @0x%08lx "
+                           "(got %02x %02x %02x %02x %02x) - wrong game build? "
+                           "grant mode NOT installed\n",
+                           TAG, (unsigned long)(uintptr_t)bt,
+                           bt[0], bt[1], bt[2], bt[3], bt[4]);
+                    fflush(stdout);
+                }
+                return;
+            }
+        }
+    }
+
     resolve_fns(base);
     if (hook_install(&g_lt_hook, (uintptr_t)target,
                      (uintptr_t)Hook_LocationalTrace, LT_PATCHLEN) == 0) {
@@ -1096,11 +1411,26 @@ static void try_install(void)
         g_base   = base;
         g_last_dump = 0;
         logged   = 0;
+        /* BUILD STAMP: "is the server actually running the .so I just built?" has cost
+         * us three false conclusions. Compile date/time answers it at a glance. */
         printf("%s installed (mode=%s, body=%.1f head=%.1f/len%.1f neck=%.1f leanfrac=%.2f "
-               "eyelean=%.2f strict=%d, game base 0x%08lx) [pose-before-trace]\n",
-               TAG, g_mode == 2 ? "dump" : (g_mode == 3 ? "pose" : "on"),
+               "eyelean=%.2f strict=%d, game base 0x%08lx) [pose-before-trace] "
+               "[build " __DATE__ " " __TIME__ "]\n",
+               TAG, g_mode == PB_MODE_DUMP  ? "dump"
+                  : g_mode == PB_MODE_POSE  ? "pose"
+                  : g_mode == PB_MODE_GRANT ? "GRANT (add-only)" : "on",
                g_radius, g_head_rad, g_head_len,
                g_neck_rad, g_lean_frac, g_eye_lean, g_strict, (unsigned long)base);
+        if (g_mode == PB_MODE_GRANT)
+            printf("%s GRANT: shift L=%.1f R=%.1f taper=%d standonly=%d maxdist=%.0f "
+                   "minent=%d headrad=%.1f swingsync=%d bulletret=0x%08lx - engine hits "
+                   "are NEVER modified\n",
+                   TAG, g_shift_sl, g_shift_sr, g_shift_taper, g_grant_standonly,
+                   g_grant_maxdist, g_grant_minent, g_head_rad, g_swing_sync,
+                   (unsigned long)g_bullet_ret);
+        printf("%s ENG logging %s (debug=%d). If no ENG# lines appear while a LEANING "
+               "player is shot at: check this build stamp first.\n",
+               TAG, g_debug ? "ON" : "OFF - set COD1RELOADED_PERBONE_DEBUG=1", g_debug);
         fflush(stdout);
     } else {
         printf("%s hook_install failed\n", TAG);
@@ -1117,11 +1447,64 @@ static void* watcher_thread(void* arg)
 
 void perbone_hit_init(void)
 {
+    /* THE RELEASE DEFAULT LIVES HERE, NOT IN start.sh.
+     *
+     * Unset => GRANT. The lean desync is a defect of our own client (it draws a leaning
+     * body 5u further out than the shared BG code poses it), so the correction belongs in
+     * the build, not in one machine's shell. We already paid for the opposite convention:
+     * lean_hitbox used to default ON, and every host that forgot to export
+     * COD1RELOADED_LEAN_HITBOX=0 silently grew invisible walls around leaning players.
+     *
+     * GRANT is the only mode safe as a default because it is strictly ADDITIVE: it can
+     * turn an engine world-miss into a hit on a leaning player, and can never reject,
+     * downgrade or relocate a hit the engine already registered. Every other mode has a
+     * path that SUBTRACTS, so they stay strictly opt-in.
+     *
+     * Explicit values still win, including switching it off entirely:
+     *   COD1RELOADED_PERBONE_HIT=0     -> not installed at all (engine vanilla)
+     *   COD1RELOADED_PERBONE_HIT=dump  -> observe only  (WARNING: perturbs the pose)
+     *   COD1RELOADED_PERBONE_HIT=p     -> pose-only
+     *   COD1RELOADED_PERBONE_HIT=1     -> full override (has a reject path: eats hits)
+     * Inherited trap, deliberately kept so old configs keep their meaning: "on" begins
+     * with 'o' and is read as OFF. Write "grant" or "1", never "on". */
     const char* e = getenv("COD1RELOADED_PERBONE_HIT");
-    if (!e || *e == '0' || *e == 'o' || *e == 'f' || *e == 'n') return;
-    if (strcmp(e, "dump") == 0 || *e == 'd') g_mode = 2;
-    else if (*e == 'p') g_mode = 3;   /* "pose": fresh-pose leaners, engine decides */
-    else g_mode = 1;
+
+    /* MUTUAL EXCLUSION with pose_sync. Both correct the SAME 5u lean desync by different
+     * means: pose_sync moves the tested pose onto the drawn one, grant adds a second
+     * volume at the drawn position. Running both applies the correction TWICE (~7.5u at
+     * full lean) and puts hittable air well outside the model. Since grant is now the
+     * built-in default, a config that only says POSE_SYNC=1 would silently stack them -
+     * so an explicit pose_sync wins over our own default. An explicit PERBONE_HIT still
+     * overrides everything, for deliberate A/B testing. */
+    if (!e || !*e) {
+        const char* ps = getenv("COD1RELOADED_POSE_SYNC");
+        if (ps && *ps && *ps != '0' && *ps != 'o' && *ps != 'f' && *ps != 'n') {
+            printf("%s not installed: POSE_SYNC=1 already corrects the lean desync "
+                   "(set COD1RELOADED_PERBONE_HIT explicitly to override)\n", TAG);
+            fflush(stdout);
+            return;
+        }
+    }
+
+    if (e && (*e == '0' || *e == 'o' || *e == 'f' || *e == 'n')) return;
+    if (!e || !*e)                                g_mode = PB_MODE_GRANT;  /* built-in */
+    else if (strcmp(e, "dump") == 0 || *e == 'd') g_mode = PB_MODE_DUMP;
+    else if (*e == 'p') g_mode = PB_MODE_POSE;   /* fresh-pose leaners, engine decides */
+    else if (*e == 'g') g_mode = PB_MODE_GRANT;  /* "grant": add-only, see header */
+    else g_mode = PB_MODE_FULL;
+
+    if (g_mode == PB_MODE_GRANT) {
+        /* Client-exact defaults, set BEFORE the env parsing so overrides still win.
+         * The mode-1 numbers were fitted by shooting at walls while the compensation
+         * model around them kept changing; grant mode instead reproduces
+         * lean_fix.cpp:159-162 verbatim - K = 5.0 left, 2.5 * right_scale 2.0 = 5.0
+         * right - which is also what the 2026-08-11 engine-verdict session measured
+         * (drawn head +16.3u vs posed head +11.3u => 5u, both sides). */
+        g_shift_sl = 5.0f;
+        g_shift_sr = 5.0f;
+        g_corner   = 0;   /* compensation lobe for a problem this mode does not have */
+        g_strict   = 0;   /* no reject path exists in grant mode anyway */
+    }
 
     const char* rd = getenv("COD1RELOADED_PERBONE_RADIUS");
     if (rd && *rd) { float v = (float)atof(rd); if (v > 0.0f && v <= 40.0f) g_radius = v; }
@@ -1160,11 +1543,24 @@ void perbone_hit_init(void)
     if (dbg && *dbg && *dbg != '0') g_debug = 1;
     const char* ls = getenv("COD1RELOADED_PERBONE_LIMBSCALE");
     if (ls && *ls) { float v = (float)atof(ls); if (v > 0.0f && v <= 4.0f) g_cap_scale = v; }
+    /* grant-mode knobs */
+    if ((q = getenv("COD1RELOADED_PERBONE_GRANT_MAXDIST")) && *q)
+        { float v = (float)atof(q); if (v > 0.0f && v <= 512.0f) g_grant_maxdist = v; }
+    if ((q = getenv("COD1RELOADED_PERBONE_GRANT_STANDONLY")) && *q)
+        g_grant_standonly = (*q != '0');
+    if ((q = getenv("COD1RELOADED_PERBONE_GRANT_MINENT")) && *q)
+        { long v = atol(q); if (v >= PB_MAX_CLIENTS && v <= ENTITYNUM_NONE) g_grant_minent = (int)v; }
 
     pthread_t tid;
     if (pthread_create(&tid, NULL, watcher_thread, NULL) == 0) {
         pthread_detach(tid);
-        printf("%s watcher started (mode=%s)\n", TAG, g_mode == 2 ? "dump" : "on");
+        printf("%s watcher started (mode=%s, %s)\n", TAG,
+               g_mode == PB_MODE_DUMP  ? "dump"
+             : g_mode == PB_MODE_POSE  ? "pose"
+             : g_mode == PB_MODE_GRANT ? "grant" : "on",
+               getenv("COD1RELOADED_PERBONE_HIT")
+                   ? "from COD1RELOADED_PERBONE_HIT"
+                   : "BUILT-IN DEFAULT");
     } else {
         printf("%s failed to start watcher\n", TAG);
     }

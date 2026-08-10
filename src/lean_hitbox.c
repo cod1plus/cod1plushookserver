@@ -266,9 +266,22 @@ static void *watcher_thread(void *arg)
 
 void lean_hitbox_init(void)
 {
+    /* OPT-IN. This used to run unless the env var was explicitly set to 0, while its two
+     * siblings (perbone_hit, pose_sync) are opt-in - so a fresh build on a host that did
+     * not export COD1RELOADED_LEAN_HITBOX=0 silently switched it back on. Nothing in the
+     * repo sets that variable; the "release config" lived only in one machine's shell.
+     *
+     * It must stay off. The 2026-07-31 audit established that the engine already resolves
+     * bullet hits against a per-part trace of the POSED skeleton, which bends with the
+     * lean on its own: widening r.mins/r.maxs here changes nothing for bullets, and those
+     * bounds DO feed movement and non-locational traces - so a leaning player grows an
+     * invisible wall roughly 20 units wide next to him that others walk into.
+     *
+     * Set COD1RELOADED_LEAN_HITBOX=1 only to re-test that conclusion. */
     const char *e = getenv("COD1RELOADED_LEAN_HITBOX");
-    if (e && (*e == '0' || *e == 'f' || *e == 'F' || *e == 'n' || *e == 'N')) {
-        printf("%s disabled (COD1RELOADED_LEAN_HITBOX=%s)\n", TAG, e);
+    if (!e || *e == '0' || *e == 'f' || *e == 'F' || *e == 'n' || *e == 'N') {
+        printf("%s disabled (engine handles leaned hits per-bone; set "
+               "COD1RELOADED_LEAN_HITBOX=1 to force it on)\n", TAG);
         return;
     }
 

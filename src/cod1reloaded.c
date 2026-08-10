@@ -165,13 +165,15 @@ static int url_is_safe(const char *u) {
 static int fetch_latest_build(void) {
     if (!url_is_safe(g_auto_url)) return 0;
     char cmd[700];
-    /* LD_PRELOAD= is REQUIRED: the server runs with LD_PRELOAD=./cod1plus.so and a
-     * child inherits it, so curl would load this very module - its constructor
-     * prints the whole startup banner and spawns its watcher threads, which looks
-     * exactly like a second server starting up in the log. The other HTTP helpers
-     * in cod1plus.c already clear it; this one had been missed. */
+    /* NOTE: the other HTTP helpers in cod1plus.c prefix this with "LD_PRELOAD= " so
+     * the spawned curl does not load cod1plus.so itself (the child inherits the
+     * server's LD_PRELOAD, and the module's constructor then prints its whole
+     * startup banner - it reads as a second server booting). That prefix was tried
+     * here and REVERTED at enzo's request: stats stopped arriving right after the
+     * rebuild that carried it. The two code paths are unrelated, so the causal link
+     * is unproven - but reverting costs nothing and the stats matter more. */
     snprintf(cmd, sizeof(cmd),
-             "LD_PRELOAD= curl -sfL --max-time 15 '%s' 2>/dev/null", g_auto_url);
+             "curl -sfL --max-time 15 '%s' 2>/dev/null", g_auto_url);
     FILE *fp = popen(cmd, "r");
     if (!fp) return 0;
     char buf[2048];

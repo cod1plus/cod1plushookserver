@@ -30,6 +30,7 @@
 #include "lean_hitbox.h"
 #include "perbone_hit.h"
 #include "pose_sync.h"
+#include "hitbox_draw.h"
 #include "antilag.h"
 #include "anim_clamp.h"
 #include "competitive_sv.h"
@@ -904,27 +905,67 @@ static int name_eq(const char *a, const char *b) {
     return (na[0] && strcmp(na, nb) == 0);
 }
 
+/* Find the roster entry for an in-game name, or -1.
+ *
+ * Tier 1: normalised equality - the common case.
+ *
+ * Tier 2: the roster name appears INSIDE the in-game name. Players decorate their nick
+ *   with a clan tag the FPSChallenge username does not carry - "^6pP ^7wormii" for
+ *   roster "wormii", "^5[^7diversity^5] ^7mskrQo" for "mskrQo" - and tier 1 cannot see
+ *   through that: normalising only removes the colour codes, the tag stays and the
+ *   strings still differ. Those two players are exactly the ones that came back from
+ *   match 316953 with "uuid":"^6pP ^7wormii", i.e. their own name as identity, which the
+ *   backend cannot resolve to an account.
+ *
+ *   Accepted ONLY when exactly one roster entry is contained in the name. With two
+ *   candidates there is no way to tell which player this is, and a wrong guess credits
+ *   someone else's stats - worse than no stats. Very short roster names are excluded
+ *   for the same reason: a two-letter nick matches half the server by accident. */
+#define ROSTER_SUBSTR_MIN 3
+
+static int find_config_player(const match_config_t *c, const char *name) {
+    if (!c || !name || !*name) return -1;
+
+    for (int i = 0; i < c->num_players; i++)
+        if (name_eq(c->players[i].name, name))
+            return i;
+
+    char nin[96];
+    name_normalize(name, nin, sizeof(nin));
+    if (!nin[0]) return -1;
+
+    int found = -1;
+    for (int i = 0; i < c->num_players; i++) {
+        char nc[96];
+        name_normalize(c->players[i].name, nc, sizeof(nc));
+        if (strlen(nc) < ROSTER_SUBSTR_MIN) continue;
+        if (strstr(nin, nc)) {
+            if (found >= 0) return -1;      /* ambiguous - refuse to guess */
+            found = i;
+        }
+    }
+    return found;
+}
+
 static const char *lookup_uuid(const match_config_t *c, const char *name) {
-    /* First: live-captured login UUID by in-game name */
+    /* First: live-captured login UUID by in-game name. This is the only identity the
+     * player actually proves, so it wins over anything derived from the roster. */
     for (int i = 0; i < g_sv_maxclients; i++) {
         if (g_client_name[i][0] && g_client_uuid[i][0] &&
             name_eq(g_client_name[i], name))
             return g_client_uuid[i];
     }
-    /* Second: match config by FPSChallenge username */
-    for (int i = 0; i < c->num_players; i++)
-        if (name_eq(c->players[i].name, name))
-            return c->players[i].uuid;
+    /* Second: match config by FPSChallenge username, clan tags tolerated. */
+    int idx = find_config_player(c, name);
+    if (idx >= 0)
+        return c->players[idx].uuid;
     return name; /* fallback */
 }
 
 static const char *expected_uuid_for_name(const match_config_t *c, const char *name) {
     if (!c || !c->loaded || !name || !*name) return NULL;
-    for (int i = 0; i < c->num_players; i++) {
-        if (name_eq(c->players[i].name, name))
-            return c->players[i].uuid;
-    }
-    return NULL;
+    int idx = find_config_player(c, name);
+    return (idx >= 0) ? c->players[idx].uuid : NULL;
 }
 
 /* Kept for diagnostics: 1 = login matches the roster entry for this name,
@@ -956,10 +997,9 @@ static const char *lookup_team_label(const match_config_t *c,
                 return c->players[i].team == 1 ? "team1" : "team2";
     }
     /* then the config name, for a client that never sent a login */
-    for (int i = 0; i < c->num_players; i++) {
-        if (name_eq(c->players[i].name, name))
-            return c->players[i].team == 1 ? "team1" : "team2";
-    }
+    int idx = find_config_player(c, name);
+    if (idx >= 0)
+        return c->players[idx].team == 1 ? "team1" : "team2";
 
     /* Fallback: infer from GSC side + halftime.
      * team1_side=1 means team1 starts as allies.
@@ -979,12 +1019,57 @@ static void resolve_scores(const match_config_t *c,
     else                  { *t1 = axis_score;  *t2 = allies_score; }
 }
 
+/* Last scores we saw in a stats event - the tie that overtime starts from. */
+static int g_last_event_allies = -1;
+static int g_last_event_axis   = -1;
+
+/* The last event we reported, kept so the end-of-map log line can re-send it as
+ * finished. Deliberately NOT paired with a sticky "map ended" global: side_tracker_reset()
+ * runs once in the .so constructor and never again, so any per-map flag would survive into
+ * the next map of a BO3 and mark every round of it finished. The re-send passes
+ * force_finished explicitly instead, and owns no state. */
+static round_event_t   g_last_ev;
+static int             g_have_last_ev  = 0;
+
+/* PAM logs a bare "OverTime;" line from _overtime.gsc::Do_Overtime() into the very log we
+ * already tail, at the moment it commits to overtime. Use it: it is a statement of fact,
+ * not an inference.
+ *
+ * The old heuristic below (round counter went backwards AND scores are tied) cannot work.
+ * sd.gsc calls logStats() at the END of a round, BEFORE the round/score-limit checks that
+ * trigger overtime, so the first event after the reset is the end of OT round 1 - by then
+ * someone has won a round and the scores are 13-12, never tied. The tie test therefore
+ * never passed and the limit was never raised; the match only ever "finished" because the
+ * round_limit clause fired. With that clause now correctly gated on a winner, overtime
+ * needs a signal that actually arrives.
+ *
+ * PAM's own rule, identical in every MR variant (rules/sd/score/mr*.gsc:27):
+ *     scr_sd_end_score = game["overtime_score"] + 4      // 12/12 -> 16/16 -> 20/20
+ * so +4 per overtime, applied to the tied score we last saw. */
+static void overtime_signalled(void) {
+    int base = (g_last_event_allies > g_last_event_axis)
+             ? g_last_event_allies : g_last_event_axis;
+    if (base <= 0) {
+        printf("%s OverTime; seen but no round scores yet - score limit left at %d\n",
+               COD1PLUS_TAG, g_current_score_limit);
+        return;
+    }
+    if (base + 4 > g_current_score_limit) {
+        g_current_score_limit = base + 4;
+        printf("%s OverTime; (score %d-%d): score_limit now %d\n",
+               COD1PLUS_TAG, g_last_event_allies, g_last_event_axis, g_current_score_limit);
+    }
+}
+
 static void side_tracker_reset(const match_config_t *c) {
     int configured_team1_side = (c && c->team1_side == 2) ? 2 : 1;
     g_team1_is_allies_current = (configured_team1_side == 1);
     g_current_score_limit = (c && c->score_limit > 0) ? c->score_limit : 13;
     g_last_event_round = -1;
     g_last_event_ht = -1;
+    g_last_event_allies = -1;
+    g_last_event_axis = -1;
+    g_have_last_ev = 0;
     g_side_tracker_initialized = 1;
 }
 
@@ -992,8 +1077,22 @@ static void side_tracker_update(const match_config_t *c, const round_event_t *ev
     if (!g_side_tracker_initialized) side_tracker_reset(c);
     if (!ev) return;
 
+    /* New map in a BO3/BO5: the score counters start over, which overtime never does
+     * (it keeps them and only raises the limit). Without this the 16 or 20 left by an
+     * overtime on map 1 would still be the limit on map 2, and map 2 would never reach
+     * it - reported "playing" to the last round. */
+    if (g_last_event_allies >= 0 &&
+        ev->allies_score + ev->axis_score < g_last_event_allies + g_last_event_axis) {
+        int base = (c && c->score_limit > 0) ? c->score_limit : 13;
+        if (g_current_score_limit != base) {
+            printf("%s New map (scores restarted): score_limit back to %d\n",
+                   COD1PLUS_TAG, base);
+            g_current_score_limit = base;
+        }
+    }
+
     int round_reset = (g_last_event_round > 0 && ev->round > 0 && ev->round < g_last_event_round);
-    /* OT detection: PAM resets round counter to 1 with tied scores (never resets the score counters) */
+    /* Kept as a belt-and-braces fallback if the OverTime; line is ever missed. */
     if (round_reset && ev->allies_score > 0 && ev->allies_score == ev->axis_score) {
         int ot_score_limit = ev->allies_score + 4;
         if (ot_score_limit > g_current_score_limit) {
@@ -1013,13 +1112,16 @@ static void side_tracker_update(const match_config_t *c, const round_event_t *ev
         }
     }
 
-    g_last_event_round = ev->round;
-    g_last_event_ht = ev->is_halftime;
+    g_last_event_round  = ev->round;
+    g_last_event_ht     = ev->is_halftime;
+    g_last_event_allies = ev->allies_score;
+    g_last_event_axis   = ev->axis_score;
 }
 
 static int build_payload(const match_config_t *c,
                          const round_event_t *ev,
-                         char *out, size_t out_sz)
+                         char *out, size_t out_sz,
+                         int force_finished)
 {
     int team1_is_allies = g_side_tracker_initialized
                         ? g_team1_is_allies_current
@@ -1035,8 +1137,24 @@ static int build_payload(const match_config_t *c,
                               ? g_current_score_limit
                               : c->score_limit;
     if (effective_score_limit <= 0) effective_score_limit = 13;
-    if (t1_score >= effective_score_limit || t2_score >= effective_score_limit ||
-        ev->round >= c->round_limit)
+
+    /* A match is over when someone REACHES THE SCORE LIMIT - never merely because the
+     * round counter hit round_limit. In MR12 a 12-12 after 24 rounds goes to overtime,
+     * and reporting finished there closed the match on the platform with a draw score
+     * (match 316953, 2026-08-07: "round":"Round 24 | MR12", 12-12, state finished).
+     *
+     * The overtime handling in side_tracker_update() cannot save us here: it only raises
+     * g_current_score_limit once PAM has restarted the round counter at 1, which happens
+     * on the FIRST event of overtime - one event AFTER this one. So the round_limit test
+     * fires first, every time.
+     *
+     * round_limit is kept only as a safety net for a match that somehow overruns, and it
+     * must never fire on a tie: with equal scores there is no winner to report. */
+    if (force_finished)
+        state = "finished";                 /* PAM said so - MatchEnd; / MapEnd; */
+    else if (t1_score >= effective_score_limit || t2_score >= effective_score_limit)
+        state = "finished";
+    else if (ev->round >= c->round_limit && t1_score != t2_score)
         state = "finished";
 
     /* Round display string, e.g. "Round 3 | MR12" */
@@ -1394,6 +1512,32 @@ static void *log_tailer_thread(void *arg) {
         fseek(f, last_pos, SEEK_SET);
         char line[8192];
         while (fgets(line, sizeof(line), f)) {
+            /* PAM announces overtime in the log before the first OT round is played. */
+            if (strstr(line, "OverTime;"))
+                overtime_signalled();
+
+            /* ...and announces the real end of the map: "MatchEnd;" in match mode,
+             * "MapEnd;" in public mode (_end_of_map.gsc::Do_Map_End). This is the only
+             * trustworthy "it is over" signal - the scores alone cannot tell a 12-12 that
+             * is about to go to overtime from a 12-12 that ends the map because
+             * scr_overtime is off. Without it, gating the round_limit clause on a winner
+             * would leave a genuine drawn map reported as "playing" forever.
+             *
+             * sd.gsc runs logStats() BEFORE the limit checks, so the last round's event
+             * has already been sent by the time this line appears: re-send it, with the
+             * state forced to finished. */
+            if (strstr(line, "MatchEnd;") || strstr(line, "MapEnd;")) {
+                printf("%s %.20s - map over\n", COD1PLUS_TAG,
+                       strstr(line, "MatchEnd;") ? "MatchEnd;" : "MapEnd;");
+                if (g_have_last_ev) {
+                    char payload[65536];
+                    build_payload(&g_cfg, &g_last_ev, payload, sizeof(payload), 1);
+                    printf("%s Re-sending final payload as finished\n", COD1PLUS_TAG);
+                    if (http_post(g_cfg.api_url, payload) != 0)
+                        printf("%s Final payload send FAILED\n", COD1PLUS_TAG);
+                }
+            }
+
             if (strstr(line, "[STATS_EVENT]")) {
                 printf("%s Event received: %.120s...\n", COD1PLUS_TAG, line);
 
@@ -1404,8 +1548,11 @@ static void *log_tailer_thread(void *arg) {
                            COD1PLUS_TAG, ev.round, ev.num_players,
                            ev.round_winner, ev.allies_score, ev.axis_score);
 
+                    g_last_ev = ev;
+                    g_have_last_ev = 1;
+
                     char payload[65536];
-                    build_payload(&g_cfg, &ev, payload, sizeof(payload));
+                    build_payload(&g_cfg, &ev, payload, sizeof(payload), 0);
                     printf("%s Sending payload (%zu bytes) to %s\n",
                            COD1PLUS_TAG, strlen(payload), g_cfg.api_url);
                     printf("%s Payload: %s\n", COD1PLUS_TAG, payload);
@@ -1450,6 +1597,7 @@ static void __attribute__((constructor)) init(void) {
      * the drawn one - the cod2x principle, replacing perbone's compensations.
      * Off unless COD1RELOADED_POSE_SYNC=1. */
     pose_sync_init();
+    hitbox_draw_init();   /* dev visualiser; no-op unless COD1RELOADED_HITBOX_DRAW=1 */
 
     /* cod1reloaded: server-side lag compensation. CoD1 has NO native antilag;
      * this implements it and reads the (previously dead) g_antilag cvar so
