@@ -131,6 +131,7 @@ typedef void (*dc_internal_t)(void* obj, void* es, int* partBits, void* ci, floa
  * one; every variable below is an override for experiments, never a requirement. */
 static hook_t         g_dci_hook;
 static dc_internal_t  orig_dc_internal = NULL;
+static uintptr_t      g_base = 0;   /* module base the live hook was written into */
 static int            g_enable = 1;   /* COD1RELOADED_POSE_SYNC=0 to disable */
 static int            g_yaw    = 1;   /* COD1RELOADED_POSE_SYNC_YAW=0 to disable.
                                        * Forces legs/torso yaw to the view before posing,
@@ -286,8 +287,6 @@ static void try_install(void)
     char line[512];
     int32_t rel;
 
-    if (orig_dc_internal) return;
-
     f = fopen("/proc/self/maps", "r");
     if (!f) return;
     while (fgets(line, sizeof(line), f)) {
@@ -298,6 +297,18 @@ static void try_install(void)
     }
     fclose(f);
     if (!base) return;
+
+    /* The game module is dlclose'd and dlopen'd on EVERY map change: fresh code (no
+     * JMP), fresh .rodata (2.5 again), very often at the SAME base. So "installed once"
+     * is not a state this module can remember - it has to look at the bytes. Live means:
+     * same base as the last install AND our detour still at the entry. Anything else
+     * (new base, or the vanilla prologue back at the same base) is a reload and we go
+     * through the full verify + retune + hook again, exactly like antilag/competitive.
+     * Until 2026-09-10 this returned as soon as orig_dc_internal was set: the server
+     * posed lean with the vanilla 2.5 from the second map onward while every client
+     * drew 7.5 - the very desync this file exists to remove, silently back after the
+     * first map rotation. */
+    if (base == g_base && *(const unsigned char*)(base + RVA_DC_INTERNAL) == 0xE9) return;
 
     /* Three independent checks. Any mismatch = a different build = do nothing.
      *   1. the OUTER function still has its known prologue,
@@ -345,6 +356,7 @@ static void try_install(void)
     if (hook_install(&g_dci_hook, base + RVA_DC_INTERNAL,
                      (uintptr_t)hook_dc_internal, DCI_PATCHLEN) == 0) {
         orig_dc_internal = (dc_internal_t)g_dci_hook.trampoline;
+        g_base = base;
         printf("%s installed (yaw=%d engine_lateral=%.2f, game base 0x%08lx) "
                "[build " __DATE__ " " __TIME__ "]\n",
                TAG, g_yaw, g_engine_lateral, (unsigned long)base);

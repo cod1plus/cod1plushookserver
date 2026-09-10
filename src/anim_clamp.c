@@ -82,7 +82,9 @@ static void try_patch(void) {
     static int logged_bad = 0;
     uintptr_t base = find_game_base();
     if (!base) return;
-    if (base == g_patched_base) return;                 /* already done this load */
+    /* No "already done this base" shortcut: a map change reloads the module, usually
+     * at the very same address, with the vanilla bytes back. The byte compare below is
+     * the only test that survives that; it is one memcmp every 400 ms. */
 
     unsigned char *site = (unsigned char *)(base + RVA_ANIMCHECK);
 
