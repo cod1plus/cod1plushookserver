@@ -42,6 +42,7 @@
 #include <pthread.h>
 
 #include "hooks.h"
+#include "gear_force.h"
 
 #define TAG "[competitive]"
 #define GAME_SO_NAME "game.mp.i386.so"
@@ -80,8 +81,9 @@ static int          g_registered = 0;
  * can drift back. COD1RELOADED_GEAR=1 leaves the cvar alone. The first map after a server
  * start still PRECACHES the gear (the scripts read the cvar in G_InitGame, before our first
  * G_RunFrame) but no player is ever spawned with it: attach() re-reads the cvar at spawn. */
-static int          g_gear_force = 1;
 static int          g_gear_done  = 0;
+#define RVA_TRAP_CVAR_INT 0x067b0c   /* trap_Cvar_VariableIntegerValue(name), as antilag.c */
+typedef int (*trap_cvar_int_t)(const char*);
 
 /* staged spec (written by watcher, read+published by the game thread) */
 static char         g_spec_pending[SPEC_MAX] = "";
@@ -188,11 +190,18 @@ static void publish_if_dirty(void) {
     }
 }
 
+/* Every frame, not once: a config exec, an rcon set or PAM can flip the cvar back to 1
+ * mid-map, and a player spawning in that state attaches models that were never
+ * precached - a script error. One integer read per frame keeps it at 0 for good; the
+ * first G_InitGame is covered earlier still by gear_force.c. */
 static void force_gear_off(void) {
-    if (!g_gear_force || g_gear_done || !g_base) return;
-    g_gear_done = 1;
+    if (!gear_force_enabled() || !g_base) return;
+    trap_cvar_int_t geti = (trap_cvar_int_t)(g_base + RVA_TRAP_CVAR_INT);
+    if (geti("g_useGear") == 0) return;
     trap_cvar_set_t set = (trap_cvar_set_t)(g_base + RVA_TRAP_CVAR_SET);
     set("g_useGear", "0");
+    if (g_gear_done) return;              /* log once per module load */
+    g_gear_done = 1;
     printf("%s g_useGear forced to 0: no attached gear on player models "
            "(COD1RELOADED_GEAR=1 to leave the cvar alone)\n", TAG);
     fflush(stdout);
@@ -273,13 +282,8 @@ static void* watcher(void* a) {
 }
 
 void competitive_sv_init(void) {
-    {
-        const char* g = getenv("COD1RELOADED_GEAR");
-        if (g && (*g == '1' || *g == 't' || *g == 'T' || *g == 'y' || *g == 'Y')) {
-            g_gear_force = 0;
-            printf("%s g_useGear left to the server config (COD1RELOADED_GEAR=%s)\n", TAG, g);
-        }
-    }
+    if (!gear_force_enabled())
+        printf("%s g_useGear left to the server config (COD1RELOADED_GEAR=1)\n", TAG);
     const char* e = getenv("COD1RELOADED_COMPETITIVE");
     if (e && (*e == '0' || *e == 'f' || *e == 'F' || *e == 'n' || *e == 'N')) {
         g_enable = 0;

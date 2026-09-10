@@ -32,10 +32,11 @@ ${CC} -m32 -shared -fPIC -O2 -Wall -Wextra ${CFLAGS_COMPAT} \
   "${ROOT_DIR}/src/antilag.c" \
   "${ROOT_DIR}/src/anim_clamp.c" \
   "${ROOT_DIR}/src/competitive_sv.c" \
+  "${ROOT_DIR}/src/gear_force.c" \
   "${ROOT_DIR}/src/cheat_gate.c" \
   "${ROOT_DIR}/archive/hooks.c" \
   -o "${BUILD_DIR}/cod1plus.so" \
-  -pthread -lm
+  -pthread -lm -ldl
 
 # Guard: refuse to ship a module the VPS cannot load. MAX_GLIBC is the highest version the
 # production cod1plus.so has ever required; anything above it is a build-host artefact and
