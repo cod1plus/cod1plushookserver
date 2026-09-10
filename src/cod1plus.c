@@ -30,6 +30,7 @@
 #include "lean_hitbox.h"
 #include "perbone_hit.h"
 #include "pose_sync.h"
+#include "swing_sync.h"
 #include "hitbox_draw.h"
 #include "antilag.h"
 #include "anim_clamp.h"
@@ -94,6 +95,8 @@ typedef struct {
     int   headshots;
     int   grenade_damage;
     float adr;
+    int   slot;   /* client slot (GSC entityId), -1 = unknown (old pk3, or the
+                   * player had already disconnected when the round ended) */
 } event_player_t;
 
 typedef struct {
@@ -655,7 +658,9 @@ static int parse_cmdline_maxclients(void) {
 
 /* ------------------------------------------------------------------ */
 /* [STATS_EVENT] line parser                                           */
-/* Format: [STATS_EVENT]r=N,as=N,xs=N,rw=X,ht=N,bp=N,ps=n:t:k:d:a:dm:g:p:df:s|… */
+/* Format: [STATS_EVENT]r=N,as=N,xs=N,rw=X,ht=N,bp=N,
+ *         ps=name:team:k:d:a:dm:g:p:df:score[:hs:gd:adr[:slot]]|…
+ * slot = client slot (GSC entityId), the name-independent identity key. */
 /* ------------------------------------------------------------------ */
 
 static int parse_event(const char *line, round_event_t *ev) {
@@ -693,21 +698,27 @@ static int parse_event(const char *line, round_event_t *ev) {
         tok = strtok(NULL, ",");
     }
 
-    /* Parse player list: name:team:kills:deaths:assists:damage:grenades:plants:defuses:score */
+    /* Parse player list:
+     * name:team:kills:deaths:assists:damage:grenades:plants:defuses:score[:hs:gd:adr[:slot]]
+     * slot (field 14, added 2026-08-23) = the GSC entityId = the CLIENT SLOT, the
+     * key that makes stats identity name-independent. Older pk3s send 13 or 10
+     * fields; both still parse (n>=10) with slot = -1. */
     char *pline = strtok(ps_buf, "|");
     while (pline && ev->num_players < MAX_PLAYERS) {
         event_player_t *ep = &ev->players[ev->num_players];
         char score_str[32] = {0};
         char adr_str[32] = {0};
+        ep->slot = -1;
         int n = sscanf(pline,
-            "%63[^:]:%15[^:]:%d:%d:%d:%d:%d:%d:%d:%31[^:]:%d:%d:%31s",
+            "%63[^:]:%15[^:]:%d:%d:%d:%d:%d:%d:%d:%31[^:]:%d:%d:%31[^:]:%d",
             ep->name, ep->team,
             &ep->kills, &ep->deaths, &ep->assists, &ep->damage,
             &ep->grenades, &ep->plants, &ep->defuses, score_str,
-            &ep->headshots, &ep->grenade_damage, adr_str);
+            &ep->headshots, &ep->grenade_damage, adr_str, &ep->slot);
         if (n >= 10) {
             ep->score = strtof(score_str, NULL);
-            if (n == 13) ep->adr = strtof(adr_str, NULL);
+            if (n >= 13) ep->adr = strtof(adr_str, NULL);
+            if (n < 14) ep->slot = -1;
             ev->num_players++;
         }
         pline = strtok(NULL, "|");
@@ -791,6 +802,25 @@ static void send_uuid_event(int client_num, const char *name, const char *uuid) 
 static void collect_client_uuids(void) {
     serverStatic_t *svs = (serverStatic_t *)ADDR_SVS;
     if (!svs || !svs->clients) return;
+    /* The walk below strides svs->clients by CLIENT_T_SIZE (362 KB). The command line
+     * rarely carries sv_maxclients (start.sh keeps it in the .cfg), and the fallback of
+     * MAX_CLIENTS=64 then read up to 23 MB past a 12/16-slot array every second: fine
+     * while that memory happened to be mapped, a SIGSEGV the day it was not (gungame
+     * end-of-round crash hunt, 2026-08-28). The engine's own cvar is the truth: its
+     * cvar_t* lives at ADDR_SV_MAXCLIENTS_CVAR (set by SV_Init, read as ->integer at
+     * +0x20 by SV_Startup/SV_ChangeMaxClients themselves - cod_lnxded 0x80905a1). */
+    {
+        const char *cv = *(const char **)ADDR_SV_MAXCLIENTS_CVAR;
+        if (cv) {
+            int mc = *(const int *)(cv + 0x20);
+            if (mc > 0 && mc <= MAX_CLIENTS && mc != g_sv_maxclients) {
+                printf("%s sv_maxclients %d -> %d (engine cvar)\n",
+                       COD1PLUS_TAG, g_sv_maxclients, mc);
+                fflush(stdout);
+                g_sv_maxclients = mc;
+            }
+        }
+    }
     for (int i = 0; i < g_sv_maxclients; i++) {
         client_t *cl = (client_t *)((char *)svs->clients + (CLIENT_T_SIZE_V15 * i));
         clientConnectState_t state = SVSCLIENT_STATE(cl);
@@ -820,6 +850,18 @@ static void collect_client_uuids(void) {
             continue;
         }
         if (uuid[0] == 0) continue;
+        /* Refresh the NAME on every pass, not only when the uuid changes: a player
+         * who renames mid-game keeps the same login, so the old code kept his OLD
+         * name here forever and the name-fallback matching silently failed for him
+         * (the exact "changed name -> no stats" report, 2026-08-23). */
+        {
+            char curname[64];
+            if (userinfo_get_safe(userinfo, 1024, "name", curname, sizeof(curname)) &&
+                curname[0] && strcmp(g_client_name[i], curname) != 0) {
+                strncpy(g_client_name[i], curname, sizeof(g_client_name[i]) - 1);
+                g_client_name[i][sizeof(g_client_name[i]) - 1] = 0;
+            }
+        }
         if (strcmp(g_client_uuid[i], uuid) != 0) {
             strncpy(g_client_uuid[i], uuid, sizeof(g_client_uuid[i]) - 1);
             g_client_uuid[i][sizeof(g_client_uuid[i]) - 1] = 0;
@@ -968,6 +1010,22 @@ static const char *expected_uuid_for_name(const match_config_t *c, const char *n
     return (idx >= 0) ? c->players[idx].uuid : NULL;
 }
 
+/* UID-only resolution (2026-08-23). The GSC now appends each stats row's client
+ * SLOT (entityId, -1 once that player disconnected). The slot indexes straight
+ * into the login-uuid table the collector maintains from live userinfo - the one
+ * identity the player actually proves - so nicknames, colour codes, clan tags and
+ * mid-game renames stop mattering entirely. All the name matching above survives
+ * only as the fallback: old pk3s without the field, and players who left before
+ * the round ended (their slot may already belong to someone else, so it must NOT
+ * be trusted - the GSC sends -1 for them). */
+static const char *uuid_for_event_player(const match_config_t *c,
+                                         const event_player_t *ep) {
+    if (ep->slot >= 0 && ep->slot < MAX_CLIENTS && ep->slot < g_sv_maxclients &&
+        g_client_uuid[ep->slot][0])
+        return g_client_uuid[ep->slot];
+    return lookup_uuid(c, ep->name);
+}
+
 /* Kept for diagnostics: 1 = login matches the roster entry for this name,
  * 0 = it does not, -1 = unknown. No longer gates the report. */
 __attribute__((unused))
@@ -980,9 +1038,11 @@ static int client_uuid_status_for_name(const char *name) {
     return -1;
 }
 
-/* Return "team1" or "team2" for a player by name from config.
-   If not found, use GSC team (allies/axis) + halftime state to infer. */
+/* Return "team1" or "team2" for a player. `login` is the ALREADY-RESOLVED uuid
+   (slot-based when available) so this stays consistent with the reported identity.
+   If the uuid is not in the roster, fall back to name, then to GSC side + halftime. */
 static const char *lookup_team_label(const match_config_t *c,
+                                     const char *login,
                                      const char *name,
                                      const char *gsc_team,
                                      int team1_is_allies)
@@ -990,7 +1050,6 @@ static const char *lookup_team_label(const match_config_t *c,
     /* Prefer the LOGIN uuid: it is the only identity the player actually proves.
      * In-game names are free text - a player may use a nick that has nothing to do
      * with his FPSChallenge username, which is common and perfectly legitimate. */
-    const char *login = lookup_uuid(c, name);
     if (login && login[0] && strcmp(login, name) != 0) {
         for (int i = 0; i < c->num_players; i++)
             if (c->players[i].uuid[0] && strcmp(c->players[i].uuid, login) == 0)
@@ -1239,8 +1298,8 @@ static int build_payload(const match_config_t *c,
          * different player per 5v5, three matches running). Identity comes from the
          * login uuid, which is emitted below; the backend decides what to do with a
          * player it cannot resolve. The mismatch is still logged at connect time. */
-        const char *uuid       = lookup_uuid(c, ep->name);
-        const char *team_label = lookup_team_label(c, ep->name, ep->team,
+        const char *uuid       = uuid_for_event_player(c, ep);
+        const char *team_label = lookup_team_label(c, uuid, ep->name, ep->team,
                                                    team1_is_allies);
         const char *team_name  = (strcmp(team_label, "team1") == 0)
                                  ? c->team1_name : c->team2_name;
@@ -1596,6 +1655,10 @@ static void __attribute__((constructor)) init(void) {
      * body shift) inside the server's own controllers, so the tested skeleton is
      * the drawn one - the cod2x principle, replacing perbone's compensations.
      * Off unless COD1RELOADED_POSE_SYNC=1. */
+    /* cod1reloaded: the server's BG_PlayerAngles gets the client's four swing constants
+     * (swing_fix.cpp) - drawn swing == tested swing for players who are NOT leaning
+     * too, which pose_sync's lean-gated yaw forcing never covered. 2026-09-09. */
+    swing_sync_init();
     pose_sync_init();
     hitbox_draw_init();   /* dev visualiser; no-op unless COD1RELOADED_HITBOX_DRAW=1 */
 

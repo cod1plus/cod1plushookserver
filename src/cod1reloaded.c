@@ -51,7 +51,9 @@ static NET_OutOfBandPrint_t p_NET_OutOfBandPrint = (NET_OutOfBandPrint_t)0x08084
 /* ---- config (env-overridable) ---- */
 static int  g_protocol         = 10;
 static int  g_min_version      = 16;  /* client "1.6" */
-static int  g_allow_unversioned = 1;  /* allow cod1reloaded==0 (bots / loopback) */
+/* 0 since 2026-08-10: the validated production policy, baked in so it does not depend on
+ * a startup script. COD1RELOADED_ALLOW_UNVERSIONED=1 to let unversioned clients in. */
+static int  g_allow_unversioned = 0;  /* allow cod1reloaded==0 (bots / loopback) */
 static int  g_min_build        = 0;  /* 0 = build gate off; e.g. 10602 for 1.6.2 */
 static int  g_min_build_manual = 0;  /* env floor; the auto gate never goes below it */
 
@@ -63,7 +65,8 @@ static int  g_min_build_manual = 0;  /* env floor; the auto gate never goes belo
  * (fail-open by construction) and the state is persisted so a restart does not
  * reset the delay. The module's own HTTP helper is raw sockets with no TLS and
  * GitHub is HTTPS-only, so the fetch shells out to curl. */
-static int  g_auto            = 0;    /* COD1RELOADED_MIN_BUILD_AUTO=1 */
+static int  g_auto            = 1;    /* COD1RELOADED_MIN_BUILD_AUTO=0 to disable.
+                                       * 1 since 2026-08-10: production policy, baked in. */
 static int  g_auto_grace_h    = 0;    /* COD1RELOADED_MIN_BUILD_GRACE_H; 0 = enforce a
                                        * new release as soon as it is seen (the client
                                        * auto-updates at launch, so the window only

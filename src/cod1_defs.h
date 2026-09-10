@@ -485,6 +485,9 @@ typedef struct {
  * e.g. svs->clients). 0x083CCDF0 below is STALE — it is the svs.challenges array. */
 #define ADDR_SVS_CLIENTS            0x083CCDF0
 #define ADDR_SVS_TIME               0x083CCD88
+/* cvar_t* sv_maxclients - the global SV_Init stores Cvar_Get("sv_maxclients") in;
+ * SV_Startup reads ->integer (+0x20) from it at cod_lnxded 0x80905ad. Deref twice. */
+#define ADDR_SV_MAXCLIENTS_CVAR     0x0836B804
 
 #define ADDR_COM_PRINTF             0x0806FC90
 #define ADDR_COM_ERROR              0x0806FEF4

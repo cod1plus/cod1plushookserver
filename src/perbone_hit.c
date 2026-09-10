@@ -1469,24 +1469,29 @@ void perbone_hit_init(void)
      * with 'o' and is read as OFF. Write "grant" or "1", never "on". */
     const char* e = getenv("COD1RELOADED_PERBONE_HIT");
 
-    /* MUTUAL EXCLUSION with pose_sync. Both correct the SAME 5u lean desync by different
-     * means: pose_sync moves the tested pose onto the drawn one, grant adds a second
-     * volume at the drawn position. Running both applies the correction TWICE (~7.5u at
-     * full lean) and puts hittable air well outside the model. Since grant is now the
-     * built-in default, a config that only says POSE_SYNC=1 would silently stack them -
-     * so an explicit pose_sync wins over our own default. An explicit PERBONE_HIT still
-     * overrides everything, for deliberate A/B testing. */
-    if (!e || !*e) {
-        const char* ps = getenv("COD1RELOADED_POSE_SYNC");
-        if (ps && *ps && *ps != '0' && *ps != 'o' && *ps != 'f' && *ps != 'n') {
-            printf("%s not installed: POSE_SYNC=1 already corrects the lean desync "
-                   "(set COD1RELOADED_PERBONE_HIT explicitly to override)\n", TAG);
-            fflush(stdout);
-            return;
-        }
-    }
+    /* DEFAULT OFF since 2026-08-10. This used to default to GRANT and rely on a gate that
+     * read getenv("COD1RELOADED_POSE_SYNC") to avoid stacking with pose_sync. That gate
+     * became a trap the moment pose_sync's default moved into the binary: with the
+     * variable no longer in the startup script, getenv returns NULL, the gate does not
+     * fire, and perbone silently reinstalls itself in grant mode - reapplying a lean
+     * correction that pose_sync already made, for ~7.5u of hittable air outside the model.
+     *
+     * A default that depends on another module's ENVIRONMENT rather than on its STATE is
+     * not a safeguard. So: unset means not installed, full stop. Nothing to keep in sync.
+     *
+     * pose_sync alone is the validated configuration (client and server measured
+     * bit-identical). Enable this only deliberately, and if you do, read the warning
+     * printed below - the lean-compensation tables in this file were calibrated against
+     * a desync that no longer exists. */
+    if (!e || !*e) return;
 
-    if (e && (*e == '0' || *e == 'o' || *e == 'f' || *e == 'n')) return;
+    if (*e == '0' || *e == 'o' || *e == 'f' || *e == 'n') return;
+
+    printf("%s WARNING: explicitly enabled while pose_sync corrects the pose. The lean "
+           "shift/eyelean/corner tables here were calibrated against the OLD desync and "
+           "will now over-correct: zero PERBONE_SHIFT_SL/SR/CL/CR, PERBONE_LEANFRAC and "
+           "PERBONE_EYELEAN unless you know why you are not.\n", TAG);
+    fflush(stdout);
     if (!e || !*e)                                g_mode = PB_MODE_GRANT;  /* built-in */
     else if (strcmp(e, "dump") == 0 || *e == 'd') g_mode = PB_MODE_DUMP;
     else if (*e == 'p') g_mode = PB_MODE_POSE;   /* fresh-pose leaners, engine decides */
