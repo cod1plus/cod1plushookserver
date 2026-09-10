@@ -8,6 +8,12 @@ SO="${1:-/mnt/c/Users/bitpo/OneDrive/Bureau/cod1plushookserver/build/cod1plus.so
 DST="$HOME/reloadtest"; pkill -f cod_lnxded 2>/dev/null; sleep 1
 rm -rf "$DST"; mkdir -p "$DST"; cp -r "$SRC"/. "$DST"/ 2>/dev/null; cd "$DST" || exit 1
 cp "$SO" ./cod1plus.so; chmod +x cod_lnxded cod1plus.so
+# GEAR_TEST=1: make every config say g_useGear 1 so only the module can bring it to 0
+if [ "${GEAR_TEST:-0}" = "1" ]; then
+  sed -i -E 's/^(seta? +g_useGear +)"[^"]*"/"1"/' __rPAMv115b5/autoexec_mp.cfg __rPAMv115b5/config_mp_server.cfg main/config_mp_server.cfg 2>/dev/null
+  echo "GEAR_TEST: configs forced to g_useGear 1 -> $(grep -h g_useGear __rPAMv115b5/autoexec_mp.cfg __rPAMv115b5/config_mp_server.cfg | tr -d '' | tr '
+' ' ')"
+fi
 ( sleep 25; echo "map mp_carentan"; sleep 25; echo "map mp_harbor"; sleep 20; echo "quit" ) | \
   env LD_PRELOAD=./cod1plus.so ./cod_lnxded +set dedicated 2 +set fs_homepath "$DST" \
   +set fs_game __rPAMv115b5 +set sv_punkbuster 0 +set net_ip 127.0.0.1 +set net_port 28997 \

@@ -72,6 +72,16 @@ static g_runframe_t orig_runframe = NULL;
 static uintptr_t    g_base       = 0;
 static int          g_enable     = 1;
 static int          g_registered = 0;
+/* g_useGear: the stock character scripts attach backpacks / bandoliers / ammo belts only
+ * while this server cvar is non-zero (character/_utility.gsc::useOptionalModels()). That gear
+ * is attached with ignoreCollision, so bullets never see it: it is a silhouette 8-17 units
+ * wider than anything that can be hit, and players aim at it. 1.6X therefore forces the
+ * cvar to 0 on every game-module load, from the game thread, so no config on any server
+ * can drift back. COD1RELOADED_GEAR=1 leaves the cvar alone. The first map after a server
+ * start still PRECACHES the gear (the scripts read the cvar in G_InitGame, before our first
+ * G_RunFrame) but no player is ever spawned with it: attach() re-reads the cvar at spawn. */
+static int          g_gear_force = 1;
+static int          g_gear_done  = 0;
 
 /* staged spec (written by watcher, read+published by the game thread) */
 static char         g_spec_pending[SPEC_MAX] = "";
@@ -178,7 +188,18 @@ static void publish_if_dirty(void) {
     }
 }
 
+static void force_gear_off(void) {
+    if (!g_gear_force || g_gear_done || !g_base) return;
+    g_gear_done = 1;
+    trap_cvar_set_t set = (trap_cvar_set_t)(g_base + RVA_TRAP_CVAR_SET);
+    set("g_useGear", "0");
+    printf("%s g_useGear forced to 0: no attached gear on player models "
+           "(COD1RELOADED_GEAR=1 to leave the cvar alone)\n", TAG);
+    fflush(stdout);
+}
+
 static void hook_G_RunFrame(int levelTime) {
+    force_gear_off();
     publish_if_dirty();
     orig_runframe(levelTime);
 }
@@ -217,6 +238,7 @@ static void try_install(void) {
 
     memset(g_vmcvar, 0, sizeof(g_vmcvar));
     g_registered = 0;                 /* re-register after a map/module reload */
+    g_gear_done  = 0;                 /* the reloaded module has the archived value again */
     g_dirty = 1;
 
     if (hook_install(&g_rf_hook, (uintptr_t)rf, (uintptr_t)hook_G_RunFrame, 5) == 0) {
@@ -251,6 +273,13 @@ static void* watcher(void* a) {
 }
 
 void competitive_sv_init(void) {
+    {
+        const char* g = getenv("COD1RELOADED_GEAR");
+        if (g && (*g == '1' || *g == 't' || *g == 'T' || *g == 'y' || *g == 'Y')) {
+            g_gear_force = 0;
+            printf("%s g_useGear left to the server config (COD1RELOADED_GEAR=%s)\n", TAG, g);
+        }
+    }
     const char* e = getenv("COD1RELOADED_COMPETITIVE");
     if (e && (*e == '0' || *e == 'f' || *e == 'F' || *e == 'n' || *e == 'N')) {
         g_enable = 0;
