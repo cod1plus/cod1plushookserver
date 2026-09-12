@@ -1,15 +1,21 @@
 #!/bin/bash
 # rig_server.sh - local measurement server: real cod_lnxded + the built module, controller
 # dump ON, gates relaxed, cheats ON, DM on the requested map. Runs until killed.
+#   usage: bash rig_server.sh [map]
+#   env:   COD1_SERVER_DIR  server folder to copy (never written to; runs on a copy in $HOME/rig)
+#          COD1PLUS_SO      module under test (default: build/cod1plus.so of this repo)
 set -u
-SRC="/mnt/c/Users/bitpo/OneDrive/Bureau/cod1 competitive server/live/matchserver1"
-SO="/mnt/c/Users/bitpo/OneDrive/Bureau/cod1plushookserver/build/cod1plus.so"
+# optional, git-ignored: export COD1_SERVER_DIR=... (see scripts/local.env.example)
+[ -f "$(dirname "$0")/../scripts/local.env" ] && . "$(dirname "$0")/../scripts/local.env"
+SRC="${COD1_SERVER_DIR:-$HOME/cod1server}"
+SO="${COD1PLUS_SO:-$(cd "$(dirname "$0")/.." && pwd)/build/cod1plus.so}"
 DST="$HOME/rig"; MAP="${1:-mp_carentan}"
+[ -f "$SO" ] || { echo "module not found: $SO (run sh scripts/build.sh first)" >&2; exit 1; }
 pkill -f cod_lnxded 2>/dev/null; sleep 1
 rm -rf "$DST"; mkdir -p "$DST"; cp -r "$SRC"/. "$DST"/ 2>/dev/null
-# the mirror is a PASSWORDED match server: open it for the local rig only
+# the source is a PASSWORDED match server: open the local copy for the rig only
 for c in "$DST/__rPAMv115b5/config_mp_server.cfg" "$DST/main/config_mp_server.cfg"; do
-  sed -i -E 's/^(seta? +(g_password|sv_privatePassword) +)"[^"]*"/""/' "$c" 2>/dev/null
+  sed -i -E 's/^(seta? +(g_password|sv_privatePassword) +)"[^"]*"/\1""/' "$c" 2>/dev/null
 done
 cd "$DST" || exit 1
 cp "$SO" ./cod1plus.so; chmod +x cod_lnxded cod1plus.so

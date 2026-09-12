@@ -4,11 +4,19 @@
 # symbol the build host has and the target does not, and a byte pattern that no longer
 # matches the shipped game.mp.i386.so.
 #   usage: bash smoketest.sh [seconds] [path/to/cod1plus.so]
+#   env:   COD1_SERVER_DIR  server folder to copy (cod_lnxded, main/, the mod dir) - never
+#                           written to, the test runs on a copy in $HOME/cod1test
+#          COD1PLUS_SO      module under test (default: build/cod1plus.so of this repo)
 set -u
-SRC="/mnt/c/Users/bitpo/OneDrive/Bureau/cod1 competitive server/live/matchserver1"
+# optional, git-ignored: export COD1_SERVER_DIR=... (see scripts/local.env.example)
+[ -f "$(dirname "$0")/../scripts/local.env" ] && . "$(dirname "$0")/../scripts/local.env"
+SRC="${COD1_SERVER_DIR:-$HOME/cod1server}"
 SECS="${1:-25}"
-SO="${2:-/mnt/c/Users/bitpo/OneDrive/Bureau/cod1plushookserver/build/cod1plus.so}"
+SO="${2:-${COD1PLUS_SO:-$(cd "$(dirname "$0")/.." && pwd)/build/cod1plus.so}}"
 DST="$HOME/cod1test"
+
+[ -f "$SO" ] || { echo "module not found: $SO (run sh scripts/build.sh first)" >&2; exit 1; }
+[ -f "$SRC/cod_lnxded" ] || { echo "no cod_lnxded in COD1_SERVER_DIR=$SRC" >&2; exit 1; }
 
 rm -rf "$DST"; mkdir -p "$DST"
 cp -r "$SRC"/. "$DST"/ 2>/dev/null

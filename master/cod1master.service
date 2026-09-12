@@ -1,0 +1,16 @@
+[Unit]
+Description=CoD1 master server (cod1reloaded)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/cod1.6/cod
+Environment=COD1MASTER_PUBLIC_IP=87.106.7.52
+ExecStart=/usr/bin/python3 /home/cod1.6/cod/cod1master.py
+# cod.pm's parser times out after 1 second: the master must never stay down.
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
