@@ -1,0 +1,63 @@
+name: Release
+
+# Builds cod1plus.so and attaches the assets to the GitHub release.
+#  - fires when you PUBLISH a release (uses that release's tag), or
+#  - run it by hand (Actions -> Release -> Run workflow) for an existing tag.
+# Tag without a leading "v" (1.6.5): gh release upload needs the raw tag name.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build + attach assets to (e.g. 1.6.5)"
+        required: true
+
+permissions:
+  contents: write   # gh release upload via GITHUB_TOKEN
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version tag
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          [ -z "$TAG" ] && TAG="${{ github.event.inputs.tag }}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"          # raw tag: what gh release upload needs
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"  # printed by the module
+          echo "Building cod1plus $TAG"
+
+      - name: Install 32-bit toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib
+
+      - name: Build cod1plus.so
+        run: |
+          # keep the compiled version in sync with the release tag
+          sed -i "s/COD1PLUS_VERSION \"[^\"]*\"/COD1PLUS_VERSION \"$VERSION\"/" src/version.h
+          grep -q "COD1PLUS_VERSION \"$VERSION\"" src/version.h
+          sh scripts/build.sh            # includes the GLIBC_2.34 guard
+          test -f build/cod1plus.so
+          strings -n 3 build/cod1plus.so | grep -qxF "$VERSION"
+
+      - name: Package assets
+        run: |
+          mkdir -p dist
+          cp build/cod1plus.so competitive.cfg.example matchdata.cfg.example dist/
+          ( cd dist && sha256sum cod1plus.so competitive.cfg.example matchdata.cfg.example > SHA256SUMS )
+          ls -l dist && cat dist/SHA256SUMS
+
+      - name: Upload assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$TAG" \
+            dist/cod1plus.so \
+            dist/competitive.cfg.example \
+            dist/matchdata.cfg.example \
+            dist/SHA256SUMS \
+            --clobber

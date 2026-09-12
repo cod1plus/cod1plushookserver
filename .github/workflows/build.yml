@@ -1,0 +1,31 @@
+name: Build
+
+# Compiles cod1plus.so on every push / PR to main. scripts/build.sh also enforces the
+# glibc floor (GLIBC_2.34): a module the game host could not LD_PRELOAD fails the job.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04   # glibc 2.39: exercises src/glibc_compat.h (the __isoc23_* trap)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install 32-bit toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib
+
+      - name: Build (glibc guard included)
+        run: |
+          sh scripts/build.sh
+          test -f build/cod1plus.so
+          file build/cod1plus.so | grep -q 'ELF 32-bit'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cod1plus-dev
+          path: build/cod1plus.so
