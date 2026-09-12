@@ -20,3 +20,6 @@
 *.bz2  binary
 cod_lnxded        binary
 game.mp.i386.so   binary
+*.py   text eol=lf
+*.yml  text eol=lf
+*.service text eol=lf

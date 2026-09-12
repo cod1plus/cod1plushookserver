@@ -1,2 +1,26 @@
-./zzzzz_vcodpam_nolib_2_15
-./IMPLEMENTATION_PLAN.md
+# build outputs (scripts/build.sh writes build/, the release workflow writes dist/)
+/build/
+/dist/
+*.so
+*.o
+*.pk3
+
+# runtime files generated or edited next to cod_lnxded - never commit real match data
+/matchdata.cfg
+/competitive.cfg
+/.minbuild_state
+*.log
+
+# personal / tooling
+/.claude/
+node_modules/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# personal test-script settings
+/scripts/local.env
