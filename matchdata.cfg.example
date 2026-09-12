@@ -1,0 +1,43 @@
+// matchdata.cfg - binds the server to one FPSChallenge match.
+//
+// Normally you never write this file: start the server with "+match create <id>" and
+// cod1plus.so fetches the match from FPSChallenge and writes ./matchdata.cfg itself
+// (next to cod_lnxded). Copy this file to matchdata.cfg only for a hand-configured match.
+// Placeholder values below; every key the module reads is listed.
+
+set cod1plus_match_id       "0"
+set cod1plus_start_time     "2026-01-01T20:00:00.000Z"
+
+set cod1plus_team1_id       "0"
+set cod1plus_team1_name     "Team A"
+set cod1plus_team1_tag      "TA"
+set cod1plus_team1_side     "1"
+
+set cod1plus_team2_id       "0"
+set cod1plus_team2_name     "Team B"
+set cod1plus_team2_tag      "TB"
+
+set cod1plus_format         "BO1"
+set cod1plus_mr             "MR12"
+set cod1plus_half_round     "12"
+set cod1plus_score_limit    "13"
+set cod1plus_round_limit    "24"
+
+// where the round payloads are POSTed (https:// goes through curl)
+set cod1plus_api_url        "https://fpschallenge.eu/api/v2/cod1/match/0"
+set cod1plus_demo_url       ""
+
+// optional: log to tail for [STATS_EVENT] lines; default <fs_homepath>/<fs_game>/games_mp.log
+// set cod1plus_logfile     "/home/cod/server/__rPAMv115b5/games_mp.log"
+
+// Players: "name,login uuid,team"  (team 1 or 2)
+set cod1plus_player1        "player1,00000000-0000-4000-8000-000000000001,1"
+set cod1plus_player2        "player2,00000000-0000-4000-8000-000000000002,1"
+set cod1plus_player3        "player3,00000000-0000-4000-8000-000000000003,1"
+set cod1plus_player4        "player4,00000000-0000-4000-8000-000000000004,1"
+set cod1plus_player5        "player5,00000000-0000-4000-8000-000000000005,1"
+set cod1plus_player6        "player6,00000000-0000-4000-8000-000000000006,2"
+set cod1plus_player7        "player7,00000000-0000-4000-8000-000000000007,2"
+set cod1plus_player8        "player8,00000000-0000-4000-8000-000000000008,2"
+set cod1plus_player9        "player9,00000000-0000-4000-8000-000000000009,2"
+set cod1plus_player10       "player10,00000000-0000-4000-8000-000000000010,2"

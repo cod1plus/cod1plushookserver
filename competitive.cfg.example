@@ -1,10 +1,82 @@
-# competitive.cfg - fair-play cvar limits pushed to every client running the mod.
-#   <cvar> <value>       -> locked to exactly <value> (player CANNOT change it)
-#   <cvar> <min> <max>   -> clamped into [min,max] (player picks a value inside)
-# Lines starting with # or ; are comments. Drop this file (renamed competitive.cfg)
-# next to cod_lnxded, or point COD1RELOADED_COMPETITIVE_FILE at it.
+# competitive.cfg.example - the fair-play cvar rules enforced by the mod instead of PunkBuster.
+# Copy to competitive.cfg next to cod_lnxded (or point COD1RELOADED_COMPETITIVE_FILE at it);
+# the file is re-read live, no restart needed.
+# (PB cannot run here: it flags the mod's own memory patches; PAM runs sv_punkbuster 0).
+#
+# Format, parsed by cod1plus.so (competitive_sv.c) and pushed to every 1.6X client:
+#   "cvar value"    -> forced + write-locked on the client
+#   "cvar min max"  -> clamped into [min,max], re-clamped continuously
+# RANGE BOUNDS ARE INTEGERS ONLY (the parser uses atoi). Floats work as forced values.
+# Comments must be on their OWN line - an inline comment corrupts the entry.
+# Vanilla clients ignore this spec entirely: keeping allow_unversioned=0 is what
+# makes it binding.
 
-com_maxfps      125 250
-snaps           40
-cl_maxpackets   125
-rate            25000
+# ---------------- netcode / timing (40-tick) ----------------
+com_maxfps 125 250
+snaps 40
+cl_maxpackets 60 250
+# rate 30000, NOT the folkloric 25000 (changed 2026-08-15). The engine's real clamp
+# is 90000 (SV_UserinfoChanged, cod_lnxded 0x445f1/0x44600 + CoDMP.exe 0x591a2/0x591ae
+# - same Q3-inherited pair cod2x's source shows unmarked, i.e. vanilla; NO 25000
+# constant exists in either binary). 25000 was only ever sv_maxRate config folklore.
+# Why it matters: at sv_fps 40 the per-snapshot byte budget is rate/40 - 25000 gave
+# 625 B/snap, HALF of vanilla 20Hz's 1250, so busy-fight snapshots got rate-delayed
+# and players warped. BUT rate 50000 @ sv_fps 40 lagged the whole server (2026-08-15):
+# the 25000 cap was accidentally LOAD-SHEDDING - a rate-limited client's snapshot is
+# not merely delayed, its BUILD (delta-encoding every entity) is skipped for that
+# frame. Uncapping made the server really build 40 snaps/s for everyone and its 25ms
+# frame budget overran. 30000 is the measured-safe middle; the real fix is sv_fps 30
+# server-side (33ms budget, 1000 B/snap with this rate, -25% load).
+# REQUIRES sv_maxRate >= 30000 in the server cfg - the effective limit is
+# min(rate, sv_maxRate), this line alone changes nothing.
+rate 30000
+# was forced 0; negative timenudge only ADDS local display delay (smoother other-
+# player interpolation for jittery connections, zero competitive upside) - at 40Hz
+# the interpolation window is 25ms, half of 20Hz, so jitter tolerance players used
+# to have needs somewhere to come from
+cl_timenudge -20 0
+# minimum 1 (was 0:5): duplicating usercmds is the defence against UPLOAD loss -
+# a lost client packet no longer stalls that player's movement server-side, which
+# is one of the two mechanisms that make an unstable player warp for everyone else.
+# Players with visible loss should run 2.
+cl_packetdup 1 5
+pmove_fixed 0
+timescale 1
+cl_avidemo 0
+
+# ---------------- input (no scripted turns) ----------------
+m_yaw 0.022
+cl_yawspeed 140
+cl_pitchspeed 140
+cl_freelook 1
+# m_pitch stays free: inverted-mouse players use -0.022 and an integer-only range
+# cannot express +-0.022. It is watched by the cheat log, not forced.
+
+# ---------------- rendering / wallhack vectors ----------------
+r_fullbright 0
+r_lightmap 0
+r_drawentities 1
+r_drawworld 1
+r_znear 4
+r_fog 1
+r_showtris 0
+r_shownormals 0
+r_nocurves 0
+r_picmip 0 3
+r_lodbias 0 1
+r_fastsky 0
+
+# ------- glow / brightness abuse (bounds wide enough for legit tuning) -------
+r_intensity 1 2
+r_overbrightbits 0 2
+r_mapoverbrightbits 1 3
+
+# ---------------- gameplay / view ----------------
+cg_thirdperson 0
+cg_drawgun 1
+cg_fov 80 160
+cg_shadows 0 1
+cg_nopredict 0
+
+# ---------------- audio ESP ----------------
+s_show 0

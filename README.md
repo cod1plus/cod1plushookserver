@@ -1,173 +1,96 @@
 # cod1plus
 
-Competitive stats tracker for Call of Duty 1 (v1.5) Search & Destroy. Hooks into the dedicated server via `LD_PRELOAD`, captures round-end events from PAM mod, and forwards fpschallenge.eu-compatible payloads through a Node.js backend.
+**cod1plus.so** is the server-side half of [COD1.6X](https://github.com/cod1plus/client): a 32-bit
+`LD_PRELOAD` module for the Call of Duty 1 (1.5) Linux dedicated server. It moves the server to the
+COD1.6X network (protocol 10, new master, client version gate), makes the server test the same player
+pose the clients draw (lean / swing / animation fixes), pushes fair-play cvar limits to every client,
+and binds the server to an FPSChallenge match.
 
-## Architecture
+> Status: 1.6.5 - pairs with COD1.6X clients 1.6+. See [CHANGELOG.md](CHANGELOG.md).
 
-```
-PAM sd.gsc (round end)
-    |
-    v
-qconsole.log  -->  cod1plus.so (log tailer)  -->  Node.js backend  -->  fpschallenge.eu
-                   parses [STATS_EVENT]           stores + forwards
-                   builds JSON payload
-```
+## Installation
 
-## Project Structure
+**Prerequisites:** a working Call of Duty 1.5 Linux dedicated server (`cod_lnxded`) with its 32-bit
+libraries, including `libstdc++.so.5` (see `docker/Dockerfile` for a Debian recipe), glibc 2.34+ and `curl`.
 
-```
-cod1plus/
-  src/
-    cod1plus.c              LD_PRELOAD shared library (C, 32-bit)
-  backend/
-    server.js               Express HTTP backend
-    package.json
-  scripts/
-    build.sh                Compilation script
-  build/
-    cod1plus.so             Compiled library
-  matchdata.cfg             Match configuration (auto-generated or manual)
-  zzzzz_vcodpam_nolib_2_15/ PAM mod with stats tracking (GSC)
-  archive/                  Legacy code
-  test/                     Test scripts and mock data
-```
+1. Download **`cod1plus.so`** from the latest release:
+   https://github.com/cod1plus/cod1plushookserver/releases/latest
+2. Copy it next to `cod_lnxded`.
+3. Launch the server with the module preloaded (this is the production line):
+   ```sh
+   exec env LD_PRELOAD=./cod1plus.so ./cod_lnxded +set dedicated 2 +set fs_homepath "$SERVER_DIR" \
+     +set fs_game __rPAMv115b5 +set sv_punkbuster 0 +set net_ip 0.0.0.0 +set net_port 28960 \
+     +set logfile 2 +set g_gametype sd +exec __autoexec.cfg +map mp_harbor
+   ```
+   The console must show `[cod1plus] Loaded (version x.y.z)` and `[cod1reloaded] protocol -> 10`.
 
-## Quick Start
+**Optional**
+- `competitive.cfg` next to `cod_lnxded` (start from [`competitive.cfg.example`](competitive.cfg.example)):
+  cvar locks / ranges pushed to every client. Re-read live, no restart.
+- **Master server:** `python3 master/cod1master.py` (UDP 20510); `master/cod1master.service` is the
+  systemd unit. Point game servers at it with `COD1RELOADED_MASTER=<ip>`.
+- **FPSChallenge match:** add `+match create <match_id>` to the launch line; the module fetches the match
+  config into `matchdata.cfg` ([`matchdata.cfg.example`](matchdata.cfg.example) shows a hand-written one).
+- **PAM mod:** the competitive mod the server runs (`fs_game __rPAMv115b5`) lives in its own repo:
+  https://github.com/cod1plus/pam
 
-### 1. Build
+## What's included
 
-Requires `gcc` with 32-bit support (`gcc-multilib` on Debian/Ubuntu).
+- Protocol 10, master repoint, client version / build gate (follows the client releases automatically).
+- Lean / pose / swing sync and animation-index clamp: the server hits the pose the client draws, and
+  "Player animation index out of range" no longer drops anyone.
+- `competitive.cfg` -> `sv_competitive` systeminfo lock (the PunkBuster replacement) + cheat gate (log or kick).
+- `g_useGear` forced to 0, 40-tick `snaps` cap (set `sv_fps 40` in the server cfg).
+- Antilag (experimental, `g_antilag` cvar).
 
-```bash
-bash scripts/build.sh
-```
+## Configuration
 
-### 2. Start the Backend
+Everything is an environment variable on the launch line; the defaults are the production values.
 
-```bash
-cd backend && npm install
-PORT=3005 node server.js
-```
+| Variable | Default | Effect |
+|---|---|---|
+| `COD1RELOADED_MASTER` | `87.106.7.52` | master server to heartbeat to (`ip[:port]`, port 20510) |
+| `COD1RELOADED_MIN_VERSION` | `16` | minimum client version (16 = 1.6) |
+| `COD1RELOADED_ALLOW_UNVERSIONED` | `0` | `1` lets vanilla / unversioned clients connect |
+| `COD1RELOADED_MIN_BUILD` | `0` (off) | manual minimum client build, e.g. `10602` |
+| `COD1RELOADED_MIN_BUILD_AUTO` / `_GRACE_H` / `_POLL_MIN` | `1` / `0` / `5` | follow the client's latest release (needs curl); grace hours; poll minutes |
+| `COD1RELOADED_SNAPS_CAP` | `40` | maximum `snaps` honoured |
+| `COD1RELOADED_COMPETITIVE` / `COD1RELOADED_COMPETITIVE_FILE` | on / `competitive.cfg` | `0` disables the cvar push; alternate file path |
+| `COD1RELOADED_CHEATGATE` | `log` | `0` off, `log` observe only, `kick` |
+| `COD1RELOADED_GEAR` | unset | `1` leaves `g_useGear` to the server cfg |
+| `COD1RELOADED_POSE_SYNC` / `_SWING_SYNC` / `_ANIM_CLAMP` | on | `0` disables the fix (debug only) |
+| `COD1RELOADED_ANTILAG` | installed, inactive | `0` = do not install; `rcon g_antilag 1` activates it |
+| `COD1PLUS_MODE` | `live` | `dev` skips the FPSChallenge match fetch |
+| `COD1MASTER_PORT` / `COD1MASTER_PUBLIC_IP` / `COD1MASTER_TIMEOUT` | `20510` / unset / `300` | master server |
 
-### 3. Run the Server
+## Building from source
 
-**With FPSChallenge (production):**
-
-The server is started with `+match create {id}`. cod1plus.so detects the match ID, calls the backend which fetches match details from the FPSChallenge API, and auto-generates `matchdata.cfg`.
-
-```bash
-LD_PRELOAD=./cod1plus.so ./cod_lnxded \
-  +exec server.cfg \
-  +match create 204673 \
-  +map mp_harbor
-```
-
-**With manual config (local dev/testing):**
-
-Create a `matchdata.cfg` file (see format below) and start without `+match create`:
-
-```bash
-LD_PRELOAD=./cod1plus.so ./cod_lnxded \
-  +exec server.cfg \
-  +map mp_harbor
+```sh
+sudo apt-get install -y gcc-multilib     # 32-bit toolchain (WSL Ubuntu works)
+sh scripts/build.sh                      # -> build/cod1plus.so
 ```
 
-## Match Setup Flow (Production)
+The script refuses to produce a module needing more than `GLIBC_2.34`: modern glibc (2.38+) silently
+rebinds `strtol` / `sscanf` to `__isoc23_*` symbols the game host does not have, so every file is compiled
+with `-include src/glibc_compat.h` - keep it. `src/shared/` is a byte-identical copy of the client repo's
+file; change it in both places.
 
-When launched with `+match create {id}`:
+## Local test server
 
-1. `cod1plus.so` constructor parses `/proc/self/cmdline` for the match ID
-2. Calls `GET http://localhost:{port}/api/match_setup?id={id}` on the local backend
-3. Backend calls `GET https://fpschallenge.eu/api/v2/{game}/match/{id}`
-4. Backend maps the API response and writes `matchdata.cfg`
-5. `cod1plus.so` reads `matchdata.cfg` and starts the log tailer
-6. Match is ready
+- **Docker:** `sh docker/run.sh [map]` builds an i386 Debian image with `libstdc++5` and runs your server
+  folder (`COD1_SERVER_DIR`) with the freshly built module. Connect with `/connect 127.0.0.1:28965`.
+- **WSL smoke test:** `bash scripts/smoketest.sh 30` copies a server folder (`COD1_SERVER_DIR`), boots
+  `cod_lnxded` with the module for 30 s and greps every module's install line. Exit 124 = still running = OK.
 
-If the backend is not yet running, cod1plus.so retries up to 10 times (2s interval) before falling back to any existing `matchdata.cfg`.
+## Release
 
-## matchdata.cfg Format
-
-```cfg
-// Match metadata
-set cod1plus_match_id       "204673"
-set cod1plus_start_time     "2026-02-16T20:00:00.000Z"
-
-// Team 1
-set cod1plus_team1_id       "220379"
-set cod1plus_team1_name     "Team Alpha"
-set cod1plus_team1_tag      "ALPHA"
-set cod1plus_team1_side     "1"
-
-// Team 2
-set cod1plus_team2_id       "220378"
-set cod1plus_team2_name     "Team Bravo"
-set cod1plus_team2_tag      "BRAVO"
-
-// Match rules
-set cod1plus_format         "BO1"
-set cod1plus_mr             "MR12"
-set cod1plus_half_round     "12"
-set cod1plus_score_limit    "13"
-set cod1plus_round_limit    "24"
-
-// Endpoints
-set cod1plus_api_url        "http://localhost:3005/api/round_end"
-set cod1plus_demo_url       ""
-set cod1plus_logfile        "./qconsole.log"
-
-// Players: name,uuid,team (1 or 2)
-set cod1plus_player1        "PlayerOne,a0e19aa5-80ca-492c-a005-6169ea032ac3,1"
-set cod1plus_player2        "PlayerTwo,ec1a67c3-8245-42a7-a726-a4c22e7a7629,2"
-```
-
-`team1_side` defines which team starts as allies (1) or axis (2). After halftime, sides swap automatically.
-
-## Backend API
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/match_setup?id={id}` | Fetch match config from FPSChallenge, write `matchdata.cfg` |
-| POST | `/api/round_end` | Receive round-end payload from cod1plus.so, store and forward |
-| GET | `/api/round_end` | Retrieve all stored round-end events |
-| POST | `/api/stats` | Generic stats storage |
-| GET | `/api/stats` | Retrieve stored stats |
-
-## Environment Variables
-
-### Backend (Node.js)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3000` | Backend listening port |
-| `FPS_API_BASE` | `https://fpschallenge.eu/api/v2` | FPSChallenge API base URL |
-| `FPS_GAME` | `cod1` | Game identifier for API path (`cod1`, `cod2`) |
-| `FPS_API_URL` | (empty) | URL to forward round-end payloads to |
-| `MATCHDATA_PATH` | `../matchdata.cfg` | Path to write generated match config |
-
-### cod1plus.so (C)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `COD1PLUS_BACKEND_PORT` | `3005` | Port of the local backend for match setup |
-
-## Stats Event Format
-
-PAM's `sd.gsc` prints a `[STATS_EVENT]` line to `qconsole.log` at the end of each round:
-
-```
-[STATS_EVENT]r=3,as=2,xs=1,rw=allies,ht=0,bp=1,ps=Player1:allies:2:1:0:120:1:1:0:2.5:1:30:40.00|Player2:axis:1:2:0:80:0:0:1:1.0:0:0:26.67
-```
-
-Fields: `r`=round, `as`=allies score, `xs`=axis score, `rw`=round winner, `ht`=halftime flag, `bp`=bomb planted.
-
-Player fields: `name:team:kills:deaths:assists:damage:grenades:plants:defuses:score:headshots:grenade_damage:adr`
-
-## Tested On
-
-- CoD1 v1.5 Linux (`cod_lnxded`)
-- Debian/Ubuntu (32-bit compilation)
-- PAM mod (vcodpam_nolib 2.15)
+1. Update `CHANGELOG.md`, commit, tag: `git tag 1.6.6 && git push --tags`
+   (major.minor follows the COD1.6X client generation, patch is free).
+2. On GitHub, **Releases -> Draft a new release** for that tag and publish it.
+3. The **Release** workflow builds `cod1plus.so` with the tag compiled in and attaches `cod1plus.so`,
+   `competitive.cfg.example`, `matchdata.cfg.example` and `SHA256SUMS` to the release
+   (or run it by hand from the Actions tab for an existing tag).
 
 ## License
 
-GPL-3.0
+GPL-3.0 - see [LICENSE](LICENSE).
