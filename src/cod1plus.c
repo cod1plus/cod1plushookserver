@@ -1,14 +1,13 @@
 /*
- * cod1plus.c  —  CoD1 SoloQ S&D Stats Tracker
+ * cod1plus.c  -  cod1plus.so entry point + FPSChallenge match binding
  *
- * Injected via LD_PRELOAD into cod_lnxded.
- * At round end, PAM's sd.gsc prints a [STATS_EVENT] line to qconsole.log.
- * This code tails that file, parses the event, merges with matchdata.cfg,
- * and POSTs the full fpschallenge.eu-compatible payload to the local backend.
+ * Injected via LD_PRELOAD into cod_lnxded. The constructor installs every module
+ * (cod1reloaded protocol/gate, pose/swing sync, anim clamp, competitive rules, ...).
  *
- * Data flow:
- *   PAM sd.gsc  →  qconsole.log  →  cod1plus.so  →  fpschallenge.eu 
- *                                                                                                    
+ * Match stats: at round end the PAM mod prints a [STATS_EVENT] line to the g_log
+ * (<fs_homepath>/<fs_game>/games_mp.log). This file tails that log, parses the event,
+ * merges it with matchdata.cfg (fetched from FPSChallenge when the server starts with
+ * "+match create <id>") and POSTs the payload to the match's api_url through curl.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -24,6 +23,7 @@
 #include <ctype.h>
 #include <time.h>
 
+#include "version.h"
 #include "cod1_defs.h"
 #include "hooks.h"
 #include "cod1reloaded.h"
@@ -922,7 +922,7 @@ static void *uuid_collector_thread(void *arg) {
  * FPSChallenge username. A CoD colour code (^1..^9), a clan tag spacing difference
  * or a stray space is enough to make the exact comparison fail, and then the player
  * is either dropped from the report (name found, uuid mismatch) or emitted with his
- * NAME as uuid (name not found), which the backend cannot match. Either way he
+ * NAME as uuid (name not found), which FPSChallenge cannot match. Either way he
  * silently has no stats - one different player per match, exactly as reported in
  * three consecutive 5v5s. Normalise before comparing: strip colour codes and all
  * whitespace, fold case. */
@@ -957,7 +957,7 @@ static int name_eq(const char *a, const char *b) {
  *   through that: normalising only removes the colour codes, the tag stays and the
  *   strings still differ. Those two players are exactly the ones that came back from
  *   match 316953 with "uuid":"^6pP ^7wormii", i.e. their own name as identity, which the
- *   backend cannot resolve to an account.
+ *   FPSChallenge cannot resolve to an account.
  *
  *   Accepted ONLY when exactly one roster entry is contained in the name. With two
  *   candidates there is no way to tell which player this is, and a wrong guess credits
@@ -1296,7 +1296,7 @@ static int build_payload(const match_config_t *c,
          * anti-impersonation guard - but names are free text and a legitimate
          * player using an unrelated nick was silently erased from the stats (one
          * different player per 5v5, three matches running). Identity comes from the
-         * login uuid, which is emitted below; the backend decides what to do with a
+         * login uuid, which is emitted below; FPSChallenge decides what to do with a
          * player it cannot resolve. The mismatch is still logged at connect time. */
         const char *uuid       = uuid_for_event_player(c, ep);
         const char *team_label = lookup_team_label(c, uuid, ep->name, ep->team,
@@ -1349,7 +1349,7 @@ static int build_payload(const match_config_t *c,
 }
 
 /* ------------------------------------------------------------------ */
-/* HTTP POST (raw socket, sends to local backend on localhost)         */
+/* HTTP POST: https:// through curl; plain http:// over a raw socket    */
 /* ------------------------------------------------------------------ */
 
 static int http_post_https(const char *url, const char *json) {
@@ -1525,7 +1525,7 @@ static int fetch_match_setup(const char *match_id) {
 }
 
 /* ------------------------------------------------------------------ */
-/* qconsole.log tailer thread                                          */
+/* games_mp.log tailer thread                                          */
 /* ------------------------------------------------------------------ */
 
 static void *log_tailer_thread(void *arg) {
@@ -1633,7 +1633,7 @@ static void *log_tailer_thread(void *arg) {
 /* ------------------------------------------------------------------ */
 
 static void __attribute__((constructor)) init(void) {
-    printf("%s Loaded (v2 — S&D SoloQ)\n", COD1PLUS_TAG);
+    printf("%s Loaded (version %s)\n", COD1PLUS_TAG, COD1PLUS_VERSION);
 
     /* cod1reloaded server-side: protocol -> 10, master repoint, version gate.
      * Runs in the .so constructor, before the engine main()/SV_Init. */
@@ -1690,7 +1690,7 @@ static void __attribute__((constructor)) init(void) {
                 if (fetch_match_setup(match_id) == 0) {
                     ok = 1;
                 } else {
-                    printf("%s Backend not ready, retrying in 2s (%d/10)...\n",
+                    printf("%s FPSChallenge not reachable, retrying in 2s (%d/10)...\n",
                            COD1PLUS_TAG, attempt);
                     sleep(2);
                 }

@@ -12,11 +12,11 @@
  *   # "<cvar> <min> <max>"  -> clamped to [min,max]      (player picks inside)
  *   com_maxfps    125 250
  *   snaps         40
- *   cl_maxpackets 125
- *   rate          25000
+ *   cl_maxpackets 60 250
+ *   rate          30000
  *
  * The .so parses that into a compact spec string:
- *   "com_maxfps=125:250 snaps=40 cl_maxpackets=125 rate=25000"
+ *   "com_maxfps=125:250 snaps=40 cl_maxpackets=60:250 rate=30000"
  * and publishes it in the cvar "sv_competitive" with CVAR_SYSTEMINFO (0x08). CoD1
  * mirrors SYSTEMINFO cvars into every client (the same channel sv_pure/sv_cheats use -
  * CONFIRMED in CoDMP.exe: sv_cheats registered 0x48 = SYSTEMINFO|ROM, applied in
