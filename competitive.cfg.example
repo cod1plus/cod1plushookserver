@@ -80,3 +80,32 @@ cg_nopredict 0
 
 # ---------------- audio ESP ----------------
 s_show 0
+
+# ---------------- PunkBuster heritage (2026-09-15) ----------------
+# Ported from the old server's pb/pbsv.cfg + pbsvuser.cfg (950 distinct pb_sv_cvar rules)
+# with scripts/pb_to_competitive.py: only the cvars that exist in the 1.5 CLIENT and are
+# NOT already CVAR_CHEAT-flagged matter here (a CHEAT cvar - r_nocull, r_lockpvs, cg_gun*,
+# fx_*, r_show* ... - is reverted to its default by the engine itself while sv_cheats is 0,
+# see scripts/cvars_client.tsv for every client cvar with its flags). The rules above that
+# ARE cheat-flagged (r_fullbright, r_drawentities, r_znear, cg_thirdperson...) are kept as
+# belt and braces only.
+# lod: PB allowed 0..4 in one file, 0..1 in the admin's file; 0..1 keeps every player model
+# at full detail (values above 1 switch LODs earlier).
+r_lodscale 0 1
+r_picmip2 0 3
+# brightness: PB's own bound; the ramp is applied by the mod per monitor
+r_gamma 0 3
+r_ignorehwgamma 0
+# NVIDIA radial fog switch: PB forced it off (fog must be the map's, r_fog is cheat-flagged)
+r_nv_fog_dist 0
+# no delta compression = free packet loss immunity for nobody, PB forced it
+cl_nodelta 0
+# sound-source overlay = audio ESP
+cg_drawSoundOverlay 0
+# NOT portable to this format (PB semantics the parser cannot express):
+#   m_pitch OUT -0.011 0.011      -> |m_pitch| < 0.011 forbidden (pitch lock); watched by the
+#                                    cheat log (COD1RELOADED_CHEATGATE), not forced: inverted
+#                                    mouse needs -0.022 and ranges are integers only
+#   r_texturemode INCLUDE "GL_LINEAR_MIPMAP_" -> substring match (bans GL_NEAREST); forcing one
+#                                    exact mode would override trilinear/bilinear choice - skipped
+#   r_displayrefresh OUT 0.1 59   -> refresh 1..59 Hz forbidden; irrelevant on modern displays
