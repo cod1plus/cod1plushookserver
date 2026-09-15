@@ -109,3 +109,6 @@ cg_drawSoundOverlay 0
 #   r_texturemode INCLUDE "GL_LINEAR_MIPMAP_" -> substring match (bans GL_NEAREST); forcing one
 #                                    exact mode would override trilinear/bilinear choice - skipped
 #   r_displayrefresh OUT 0.1 59   -> refresh 1..59 Hz forbidden; irrelevant on modern displays
+# sun lighting quality: PB forced the defaults (lower steps flatten the lighting = players stand out)
+r_diffusesunsteps 3
+r_diffusesunquality 2
