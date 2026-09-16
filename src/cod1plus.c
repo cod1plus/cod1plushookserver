@@ -841,10 +841,15 @@ static void collect_client_uuids(void) {
          * Observe-only by default; see cheat_gate.c. Runs before the login/uuid path so
          * it also covers clients that never send a login key. */
         if (cheat_gate_enabled()) {
-            char ac[16], acname[64];
+            char ac[16], rs[96], acname[64];
             if (!userinfo_get_safe(userinfo, 1024, "cod1x_ac", ac, sizeof(ac))) ac[0] = 0;
+            if (!userinfo_get_safe(userinfo, 1024, "cod1x_rs", rs, sizeof(rs))) rs[0] = 0;
             if (!userinfo_get_safe(userinfo, 1024, "name", acname, sizeof(acname))) acname[0] = 0;
-            cheat_gate_check(i, acname, ac);
+            /* this thread never drops: the game thread does (cheat_gate_run_pending) */
+            if (cheat_gate_check(i, acname, ac))
+                cheat_gate_request_drop(i, acname, "cheat cvar(s) present");
+            else if (cheat_gate_check_ruleset(i, acname, rs, competitive_sv_ruleset_id()))
+                cheat_gate_request_drop(i, acname, "fights the ruleset enforcement");
         }
         if (!userinfo_get_safe(userinfo, 1024, "login", uuid, sizeof(uuid))) {
             continue;

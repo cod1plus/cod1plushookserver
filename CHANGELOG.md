@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.6 (unreleased)
+
+- Embedded ruleset (the cod2x way): the server publishes `sv_competitive_ruleset` (env `COD1RELOADED_RULESET`,
+  default `codbase-2023-05`); 1.6.6+ clients carry the full CoDBase PunkBuster list and enforce it locally,
+  `competitive.cfg` keeps priority for the cvars it names. `0` publishes nothing.
+- cheat_gate reads the client's ruleset report (`cod1x_rs`): persistent violations are kickable
+  (`COD1RELOADED_CHEATGATE=kick`), probe hits and pre-1.6.6 clients are logged only.
+- cheat_gate now actually drops: the userinfo sweep queues, the game thread calls `SV_DropClient`
+  (the 1.6.5 kick mode only logged "-> DROP").
+- `COD1RELOADED_COMPETITIVE=0` keeps the G_RunFrame hook (gear force + drop queue), only the publication is empty.
+
 ## 1.6.5 (unreleased)
 
 Repository clean-up: the PAM mod moved to its own repo (https://github.com/cod1plus/pam), the legacy Node

@@ -43,6 +43,8 @@
 
 #include "hooks.h"
 #include "gear_force.h"
+#include "competitive_sv.h"
+#include "cheat_gate.h"
 
 #define TAG "[competitive]"
 #define GAME_SO_NAME "game.mp.i386.so"
@@ -93,6 +95,23 @@ static volatile int g_dirty = 0;
 static const char* cfg_path(void) {
     const char* e = getenv("COD1RELOADED_COMPETITIVE_FILE");
     return (e && e[0]) ? e : "competitive.cfg";
+}
+
+/* Embedded ruleset selector (the cod2x way of carrying the long PunkBuster list: the
+ * rules live in the CLIENT, compiled from rulesets/<id>.pb; the server only names the
+ * set). Published as the SYSTEMINFO cvar "sv_competitive_ruleset"; a 1.6.6+ client that
+ * carries that id enforces it locally and reports through userinfo "cod1x_rs" (read by
+ * cheat_gate.c). The pushed competitive.cfg spec keeps priority over the embedded rules
+ * for the cvars it names. COD1RELOADED_RULESET=0 (or empty) publishes nothing. */
+static const char* ruleset_id(void) {
+    const char* e = getenv("COD1RELOADED_RULESET");
+    if (!e) return "codbase-2023-05";
+    if (!e[0] || (e[0] == '0' && !e[1])) return "";
+    return e;
+}
+
+const char* competitive_sv_ruleset_id(void) {
+    return g_enable ? ruleset_id() : "";
 }
 
 /* Parse competitive.cfg into `out`. Lines: "cvar value" or "cvar min max". '#'/';'
@@ -154,6 +173,7 @@ static void publish_if_dirty(void) {
             chunk_name(i, nm, sizeof(nm));
             reg(g_vmcvar, nm, "", CVAR_SYSTEMINFO);   /* create + flag */
         }
+        reg(g_vmcvar, "sv_competitive_ruleset", "", CVAR_SYSTEMINFO);
         g_dirty = 1;                                  /* force first push */
         printf("%s sv_competitive registered as SYSTEMINFO in %d parts "
                "(broadcast to clients)\n", TAG, SPEC_CHUNKS);
@@ -186,6 +206,10 @@ static void publish_if_dirty(void) {
         }
         printf("%s published spec to clients in %d part(s): \"%s\"\n",
                TAG, used, spec[0] ? spec : "(empty)");
+        set("sv_competitive_ruleset", competitive_sv_ruleset_id());
+        printf("%s embedded ruleset for 1.6.6+ clients: %s\n", TAG,
+               competitive_sv_ruleset_id()[0] ? competitive_sv_ruleset_id()
+                                              : "(none, COD1RELOADED_RULESET=0)");
         fflush(stdout);
     }
 }
@@ -210,6 +234,7 @@ static void force_gear_off(void) {
 static void hook_G_RunFrame(int levelTime) {
     force_gear_off();
     publish_if_dirty();
+    cheat_gate_run_pending();         /* drops queued by the userinfo sweep thread */
     orig_runframe(levelTime);
 }
 
@@ -286,9 +311,10 @@ void competitive_sv_init(void) {
         printf("%s g_useGear left to the server config (COD1RELOADED_GEAR=1)\n", TAG);
     const char* e = getenv("COD1RELOADED_COMPETITIVE");
     if (e && (*e == '0' || *e == 'f' || *e == 'F' || *e == 'n' || *e == 'N')) {
+        /* still install the G_RunFrame hook: it also carries the gear force and the
+         * cheat_gate drop queue; only the spec / ruleset publication stays empty */
         g_enable = 0;
-        printf("%s disabled (COD1RELOADED_COMPETITIVE=%s)\n", TAG, e);
-        return;
+        printf("%s disabled (COD1RELOADED_COMPETITIVE=%s): no spec, no ruleset\n", TAG, e);
     }
     pthread_t tid;
     if (pthread_create(&tid, NULL, watcher, NULL) == 0) {

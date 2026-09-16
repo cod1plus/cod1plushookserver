@@ -6,7 +6,11 @@
 # Format, parsed by cod1plus.so (competitive_sv.c) and pushed to every 1.6X client:
 #   "cvar value"    -> forced + write-locked on the client
 #   "cvar min max"  -> clamped into [min,max], re-clamped continuously
-# RANGE BOUNDS ARE INTEGERS ONLY (the parser uses atoi). Floats work as forced values.
+# Range bounds and values may be floats ("cl_timenudge -20 0", "m_yaw 0.022"); a 1.6.5 client
+# applied only positive integers, 1.6.6+ applies everything, zero and negatives included.
+# This file OVERRIDES the embedded ruleset (sv_competitive_ruleset, ~430 CoDBase PunkBuster
+# rules compiled into the 1.6.6+ client) for the cvars it names; everything else in that
+# list is enforced by the client on its own. COD1RELOADED_RULESET=0 turns the list off.
 # Comments must be on their OWN line - an inline comment corrupts the entry.
 # Vanilla clients ignore this spec entirely: keeping allow_unversioned=0 is what
 # makes it binding.

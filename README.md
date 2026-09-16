@@ -26,7 +26,9 @@ libraries, including `libstdc++.so.5` (see `docker/Dockerfile` for a Debian reci
 
 **Optional**
 - `competitive.cfg` next to `cod_lnxded` (start from [`competitive.cfg.example`](competitive.cfg.example)):
-  cvar locks / ranges pushed to every client. Re-read live, no restart.
+  cvar locks / ranges pushed to every client. Re-read live, no restart. On top of it the module names an
+  embedded PunkBuster ruleset (`sv_competitive_ruleset`, default `codbase-2023-05`, ~430 CoDBase rules) that
+  1.6.6+ clients carry and enforce locally; `competitive.cfg` overrides it for the cvars it lists.
 - **Master server:** `python3 master/cod1master.py` (UDP 20510); `master/cod1master.service` is the
   systemd unit. Point game servers at it with `COD1RELOADED_MASTER=<ip>`.
 - **FPSChallenge match:** add `+match create <match_id>` to the launch line; the module fetches the match
@@ -39,7 +41,8 @@ libraries, including `libstdc++.so.5` (see `docker/Dockerfile` for a Debian reci
 - Protocol 10, master repoint, client version / build gate (follows the client releases automatically).
 - Lean / pose / swing sync and animation-index clamp: the server hits the pose the client draws, and
   "Player animation index out of range" no longer drops anyone.
-- `competitive.cfg` -> `sv_competitive` systeminfo lock (the PunkBuster replacement) + cheat gate (log or kick).
+- `competitive.cfg` -> `sv_competitive` systeminfo lock + embedded client ruleset (the PunkBuster replacement)
+  + cheat gate (log or kick: cheat cvar names, or a client that fights the ruleset enforcement).
 - `g_useGear` forced to 0, 40-tick `snaps` cap (set `sv_fps 40` in the server cfg).
 - Antilag (experimental, `g_antilag` cvar).
 
@@ -55,8 +58,9 @@ Everything is an environment variable on the launch line; the defaults are the p
 | `COD1RELOADED_MIN_BUILD` | `0` (off) | manual minimum client build, e.g. `10602` |
 | `COD1RELOADED_MIN_BUILD_AUTO` / `_GRACE_H` / `_POLL_MIN` | `1` / `0` / `5` | follow the client's latest release (needs curl); grace hours; poll minutes |
 | `COD1RELOADED_SNAPS_CAP` | `40` | maximum `snaps` honoured |
-| `COD1RELOADED_COMPETITIVE` / `COD1RELOADED_COMPETITIVE_FILE` | on / `competitive.cfg` | `0` disables the cvar push; alternate file path |
-| `COD1RELOADED_CHEATGATE` | `log` | `0` off, `log` observe only, `kick` |
+| `COD1RELOADED_COMPETITIVE` / `COD1RELOADED_COMPETITIVE_FILE` | on / `competitive.cfg` | `0` disables the cvar push and the ruleset; alternate file path |
+| `COD1RELOADED_RULESET` | `codbase-2023-05` | embedded ruleset id the 1.6.6+ clients must enforce; `0` = none (fun / aim servers) |
+| `COD1RELOADED_CHEATGATE` | `log` | `0` off, `log` observe only, `kick` (drops on cheat cvars and persistent ruleset violations; probes and old clients are only logged) |
 | `COD1RELOADED_GEAR` | unset | `1` leaves `g_useGear` to the server cfg |
 | `COD1RELOADED_POSE_SYNC` / `_SWING_SYNC` / `_ANIM_CLAMP` | on | `0` disables the fix (debug only) |
 | `COD1RELOADED_ANTILAG` | installed, inactive | `0` = do not install; `rcon g_antilag 1` activates it |
