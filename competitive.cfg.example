@@ -78,7 +78,7 @@ r_mapoverbrightbits 1 3
 # ---------------- gameplay / view ----------------
 cg_thirdperson 0
 cg_drawgun 1
-cg_fov 80 160
+cg_fov 80 95
 cg_shadows 0 1
 cg_nopredict 0
 
