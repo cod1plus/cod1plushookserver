@@ -1,0 +1,9 @@
+# ruleset.txt - which fair-play ruleset the 1.6.6+ clients must enforce on this server.
+# Copy to ruleset.txt next to cod_lnxded (or point COD1RELOADED_RULESET_FILE at it).
+# Re-read live every second. The rules themselves live in https://github.com/cod1plus/rulesets
+# (one <id>.pb per id); clients download them at launch, so nothing else to install here.
+#   <id>            name the list (default when this file is absent: codbase-2023-05)
+#   <id>@<version>  same, and clients behind that version re-download it IN GAME
+#                   (edit the .pb online, bump its "; version N" header, write "<id>@N" here)
+#   0               no ruleset (fun / aim-trainer server; competitive.cfg still applies)
+codbase-2023-05

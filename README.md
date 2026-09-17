@@ -26,9 +26,11 @@ libraries, including `libstdc++.so.5` (see `docker/Dockerfile` for a Debian reci
 
 **Optional**
 - `competitive.cfg` next to `cod_lnxded` (start from [`competitive.cfg.example`](competitive.cfg.example)):
-  cvar locks / ranges pushed to every client. Re-read live, no restart. On top of it the module names an
-  embedded PunkBuster ruleset (`sv_competitive_ruleset`, default `codbase-2023-05`, ~430 CoDBase rules) that
-  1.6.6+ clients carry and enforce locally; `competitive.cfg` overrides it for the cvars it lists.
+  cvar locks / ranges pushed to every client. Re-read live, no restart.
+- `ruleset.txt` (see [`ruleset.txt.example`](ruleset.txt.example)): the PunkBuster ruleset id the 1.6.6+ clients
+  enforce (~430 CoDBase rules, hosted in https://github.com/cod1plus/rulesets and downloaded by the clients).
+  Default `codbase-2023-05`; write `<id>@<version>` to make connected clients re-download a bumped list, `0`
+  for none. Re-read live. `competitive.cfg` overrides the list for the cvars it names.
 - **Master server:** `python3 master/cod1master.py` (UDP 20510); `master/cod1master.service` is the
   systemd unit. Point game servers at it with `COD1RELOADED_MASTER=<ip>`.
 - **FPSChallenge match:** add `+match create <match_id>` to the launch line; the module fetches the match
@@ -59,7 +61,7 @@ Everything is an environment variable on the launch line; the defaults are the p
 | `COD1RELOADED_MIN_BUILD_AUTO` / `_GRACE_H` / `_POLL_MIN` | `1` / `0` / `5` | follow the client's latest release (needs curl); grace hours; poll minutes |
 | `COD1RELOADED_SNAPS_CAP` | `40` | maximum `snaps` honoured |
 | `COD1RELOADED_COMPETITIVE` / `COD1RELOADED_COMPETITIVE_FILE` | on / `competitive.cfg` | `0` disables the cvar push and the ruleset; alternate file path |
-| `COD1RELOADED_RULESET` | `codbase-2023-05` | embedded ruleset id the 1.6.6+ clients must enforce; `0` = none (fun / aim servers) |
+| `COD1RELOADED_RULESET` / `COD1RELOADED_RULESET_FILE` | `codbase-2023-05` / `ruleset.txt` | ruleset id when `ruleset.txt` is absent (`0` = none); alternate file path |
 | `COD1RELOADED_CHEATGATE` | `log` | `0` off, `log` observe only, `kick` (drops on cheat cvars and persistent ruleset violations; probes and old clients are only logged) |
 | `COD1RELOADED_GEAR` | unset | `1` leaves `g_useGear` to the server cfg |
 | `COD1RELOADED_POSE_SYNC` / `_SWING_SYNC` / `_ANIM_CLAMP` | on | `0` disables the fix (debug only) |
@@ -92,7 +94,7 @@ file; change it in both places.
    (major.minor follows the COD1.6X client generation, patch is free).
 2. On GitHub, **Releases -> Draft a new release** for that tag and publish it.
 3. The **Release** workflow builds `cod1plus.so` with the tag compiled in and attaches `cod1plus.so`,
-   `competitive.cfg.example`, `matchdata.cfg.example` and `SHA256SUMS` to the release
+   `competitive.cfg.example`, `ruleset.txt.example`, `matchdata.cfg.example` and `SHA256SUMS` to the release
    (or run it by hand from the Actions tab for an existing tag).
 
 ## License

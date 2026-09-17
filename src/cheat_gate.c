@@ -7,9 +7,10 @@
  *
  *   cod1x_ac  (cheat_scan.cpp) count of blocklisted cheat cvar names that EXIST in the
  *             client's cvar table (ogc_aim, w_wallhack, hax_aimbot, ...).
- *   cod1x_rs  (ruleset.cpp, 1.6.6+) report of the EMBEDDED ruleset - the long
- *             PunkBuster list compiled into the client, selected by the server through
- *             the systeminfo cvar sv_competitive_ruleset (competitive_sv.c):
+ *   cod1x_rs  (ruleset.cpp, 1.6.6+) report of the ruleset - the long PunkBuster list
+ *             the client downloads (cod1plus/rulesets) or carries compiled in, selected
+ *             by the server through the systeminfo cvar sv_competitive_ruleset
+ *             (competitive_sv.c). <id> below is "<base>@<version enforced>":
  *               "<id>:ok"                  every rule satisfied
  *               "<id>:v<n>:<cvar>[,<cvar>]" n PERSISTENT violations: a cvar the client
  *                                          fixed that came back out of rule = a client
@@ -56,6 +57,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdint.h>
 #include <unistd.h>
 
@@ -183,17 +185,27 @@ int cheat_gate_check_ruleset(int slot, const char *name, const char *rs, const c
         return 0;
     }
 
-    /* "<id>:<verdict>" */
+    /* "<base>@<version>:<verdict>" (the version part is optional on both sides) */
     const char *colon = strchr(rs, ':');
     if (!colon) return 0;
-    size_t idlen = (size_t)(colon - rs);
     const char *verdict = colon + 1;
-    int id_ok = (strlen(want) == idlen && !strncmp(rs, want, idlen));
+    size_t idlen = (size_t)(colon - rs);
+    const char *at = memchr(rs, '@', idlen);
+    size_t baselen = at ? (size_t)(at - rs) : idlen;
+    int client_ver = at ? atoi(at + 1) : 0;
+    const char *wat = strchr(want, '@');
+    size_t wbaselen = wat ? (size_t)(wat - want) : strlen(want);
+    int want_ver = wat ? atoi(wat + 1) : 0;
+    int id_ok = (baselen == wbaselen && !strncasecmp(rs, want, baselen));
 
     if (!strcmp(verdict, "ok")) {
         if (!id_ok)
             printf("%s slot=%d name=%s reports ruleset \"%.*s\" ok but the server asks "
                    "for %s\n", TAG, slot, nm, (int)idlen, rs, want);
+        else if (want_ver && client_ver < want_ver)
+            printf("%s slot=%d name=%s enforces %.*s v%d, the server asks v%d (his download "
+                   "is pending or the file online is behind) [log-only]\n",
+                   TAG, slot, nm, (int)baselen, rs, client_ver, want_ver);
         return 0;
     }
     if (!strcmp(verdict, "missing")) {

@@ -47,8 +47,8 @@ jobs:
       - name: Package assets
         run: |
           mkdir -p dist
-          cp build/cod1plus.so competitive.cfg.example matchdata.cfg.example dist/
-          ( cd dist && sha256sum cod1plus.so competitive.cfg.example matchdata.cfg.example > SHA256SUMS )
+          cp build/cod1plus.so competitive.cfg.example ruleset.txt.example matchdata.cfg.example dist/
+          ( cd dist && sha256sum cod1plus.so competitive.cfg.example ruleset.txt.example matchdata.cfg.example > SHA256SUMS )
           ls -l dist && cat dist/SHA256SUMS
 
       - name: Upload assets to the release
@@ -58,6 +58,7 @@ jobs:
           gh release upload "$TAG" \
             dist/cod1plus.so \
             dist/competitive.cfg.example \
+            dist/ruleset.txt.example \
             dist/matchdata.cfg.example \
             dist/SHA256SUMS \
             --clobber

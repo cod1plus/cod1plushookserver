@@ -97,21 +97,67 @@ static const char* cfg_path(void) {
     return (e && e[0]) ? e : "competitive.cfg";
 }
 
-/* Embedded ruleset selector (the cod2x way of carrying the long PunkBuster list: the
- * rules live in the CLIENT, compiled from rulesets/<id>.pb; the server only names the
- * set). Published as the SYSTEMINFO cvar "sv_competitive_ruleset"; a 1.6.6+ client that
- * carries that id enforces it locally and reports through userinfo "cod1x_rs" (read by
- * cheat_gate.c). The pushed competitive.cfg spec keeps priority over the embedded rules
- * for the cvars it names. COD1RELOADED_RULESET=0 (or empty) publishes nothing. */
-static const char* ruleset_id(void) {
+/* Ruleset selector (the cod2x way of carrying the long PunkBuster list: the rules live
+ * in the CLIENT - downloaded from the cod1plus/rulesets repo, cached, with a compiled
+ * fallback - and the server only NAMES the set). Published as the SYSTEMINFO cvar
+ * "sv_competitive_ruleset" as "<id>" or "<id>@<version>": a 1.6.6+ client behind that
+ * version re-downloads the list in game (hot reload: edit the .pb online, bump its
+ * "; version N" header, write the new "<id>@N" here). The client reports through
+ * userinfo "cod1x_rs" (read by cheat_gate.c). The pushed competitive.cfg spec keeps
+ * priority over the ruleset for the cvars it names.
+ *   ruleset.txt next to competitive.cfg ($COD1RELOADED_RULESET_FILE): first non-comment
+ *   line = the id, re-read live every second. "0" or empty = publish nothing.
+ *   Absent file: env COD1RELOADED_RULESET, default "codbase-2023-05". */
+static char g_ruleset_live[80] = "";
+static char g_ruleset_pending[80] = "";
+static int  g_ruleset_init = 0;
+
+static const char* ruleset_file(void) {
+    const char* e = getenv("COD1RELOADED_RULESET_FILE");
+    return (e && e[0]) ? e : "ruleset.txt";
+}
+
+static const char* ruleset_default(void) {
     const char* e = getenv("COD1RELOADED_RULESET");
     if (!e) return "codbase-2023-05";
     if (!e[0] || (e[0] == '0' && !e[1])) return "";
     return e;
 }
 
+/* watcher thread: the id to publish now (file, else env/default) */
+static void read_ruleset_id(char* out, size_t n) {
+    snprintf(out, n, "%s", ruleset_default());
+    FILE* f = fopen(ruleset_file(), "r");
+    if (!f) return;
+    char line[128];
+    while (fgets(line, sizeof(line), f)) {
+        char tok[80];
+        if (sscanf(line, " %79s", tok) != 1) continue;
+        if (tok[0] == '#' || tok[0] == ';' || tok[0] == '/') continue;
+        if (tok[0] == '0' && !tok[1]) tok[0] = 0;
+        /* only [A-Za-z0-9_.-] and one '@' followed by digits: the client refuses anything
+         * else, so refuse it here too and say so */
+        int ok = 1, at = 0;
+        for (const char* p = tok; *p; p++) {
+            char c = *p;
+            if (c == '@' && !at) { at = 1; continue; }
+            if (at ? !(c >= '0' && c <= '9')
+                   : !(isalnum((unsigned char)c) || c == '_' || c == '-' || c == '.')) { ok = 0; break; }
+        }
+        if (!ok) {
+            printf("%s ruleset.txt: \"%s\" is not a valid ruleset id (letters, digits, _ - . and "
+                   "an optional @version) - ignored\n", TAG, tok);
+            fflush(stdout);
+            break;
+        }
+        snprintf(out, n, "%s", tok);
+        break;
+    }
+    fclose(f);
+}
+
 const char* competitive_sv_ruleset_id(void) {
-    return g_enable ? ruleset_id() : "";
+    return g_enable ? g_ruleset_live : "";
 }
 
 /* Parse competitive.cfg into `out`. Lines: "cvar value" or "cvar min max". '#'/';'
@@ -206,10 +252,14 @@ static void publish_if_dirty(void) {
         }
         printf("%s published spec to clients in %d part(s): \"%s\"\n",
                TAG, used, spec[0] ? spec : "(empty)");
-        set("sv_competitive_ruleset", competitive_sv_ruleset_id());
-        printf("%s embedded ruleset for 1.6.6+ clients: %s\n", TAG,
-               competitive_sv_ruleset_id()[0] ? competitive_sv_ruleset_id()
-                                              : "(none, COD1RELOADED_RULESET=0)");
+        {
+            char rs[80];
+            memcpy(rs, g_ruleset_pending, sizeof(rs));
+            rs[sizeof(rs) - 1] = 0;
+            set("sv_competitive_ruleset", g_enable ? rs : "");
+            printf("%s ruleset for 1.6.6+ clients: %s\n", TAG,
+                   (g_enable && rs[0]) ? rs : "(none)");
+        }
         fflush(stdout);
     }
 }
@@ -299,6 +349,19 @@ static void* watcher(void* a) {
                 memcpy(g_spec_live, spec, sizeof(g_spec_live));
                 memcpy(g_spec_pending, spec, sizeof(g_spec_pending));
                 g_dirty = 1;                           /* game thread will push it */
+            }
+            char rs[80];
+            read_ruleset_id(rs, sizeof(rs));           /* ruleset.txt / env, same cadence */
+            if (!g_ruleset_init || strcmp(rs, g_ruleset_live) != 0) {
+                if (g_ruleset_init)
+                    printf("%s ruleset id %s -> %s (%s)\n", TAG,
+                           g_ruleset_live[0] ? g_ruleset_live : "(none)", rs[0] ? rs : "(none)",
+                           ruleset_file());
+                g_ruleset_init = 1;
+                memcpy(g_ruleset_live, rs, sizeof(g_ruleset_live));
+                memcpy(g_ruleset_pending, rs, sizeof(g_ruleset_pending));
+                g_dirty = 1;
+                fflush(stdout);
             }
         }
         usleep(1000 * 1000);                           /* re-check the file every 1s */
