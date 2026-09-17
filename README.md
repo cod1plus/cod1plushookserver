@@ -36,7 +36,7 @@ libraries, including `libstdc++.so.5` (see `docker/Dockerfile` for a Debian reci
 - **FPSChallenge match:** add `+match create <match_id>` to the launch line; the module fetches the match
   config into `matchdata.cfg` ([`matchdata.cfg.example`](matchdata.cfg.example) shows a hand-written one).
 - **PAM mod:** the competitive mod the server runs (`fs_game __rPAMv115b5`) lives in its own repo:
-  https://github.com/cod1plus/pam
+  https://github.com/cod1plus/cod1pluspam
 
 ## What's included
 

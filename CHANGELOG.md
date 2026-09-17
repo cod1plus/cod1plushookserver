@@ -15,7 +15,7 @@
 
 ## 1.6.5 (unreleased)
 
-Repository clean-up: the PAM mod moved to its own repo (https://github.com/cod1plus/pam), the legacy Node
+Repository clean-up: the PAM mod moved to its own repo (https://github.com/cod1plus/cod1pluspam), the legacy Node
 backend, build outputs and personal files were dropped, `hooks.c` moved into `src/`, the module now prints
 its version (`[cod1plus] Loaded (version x.y.z)`), CI builds on every push and releases attach the assets.
 
