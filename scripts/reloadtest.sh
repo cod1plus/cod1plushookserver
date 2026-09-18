@@ -11,7 +11,7 @@ set -u
 [ -f "$(dirname "$0")/../scripts/local.env" ] && . "$(dirname "$0")/../scripts/local.env"
 SRC="${COD1_SERVER_DIR:-$HOME/cod1server}"
 SO="${1:-${COD1PLUS_SO:-$(cd "$(dirname "$0")/.." && pwd)/build/cod1plus.so}}"
-DST="$HOME/reloadtest"; pkill -f cod_lnxded 2>/dev/null; sleep 1
+DST="$HOME/reloadtest"; pkill -x cod_lnxded 2>/dev/null; sleep 1
 [ -f "$SO" ] || { echo "module not found: $SO (run sh scripts/build.sh first)" >&2; exit 1; }
 rm -rf "$DST"; mkdir -p "$DST"; cp -r "$SRC"/. "$DST"/ 2>/dev/null; cd "$DST" || exit 1
 cp "$SO" ./cod1plus.so; chmod +x cod_lnxded cod1plus.so
