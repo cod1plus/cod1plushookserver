@@ -109,6 +109,28 @@ typedef void (*dc_internal_t)(void* obj, void* es, int* partBits, void* ci, floa
                                 * ClientEndFrame 0x3b00c..0x3b03c copies ps.viewangles
                                 * [0..2] to ci+0x3e8/0x3ec/0x3f0. */
 #define ES_CLIENTNUM   0x90    /* read at 0x1a3d5 and 0x3afc5 */
+#define CI_CONTROL     0x3fc   /* ci->control: 6 vec3, then tag_origin angles (+0x444)
+                                * and offset (+0x450) - the buffer's own layout. The
+                                * engine limiter reads/writes it at 0x1addf / 0x1ae4b /
+                                * 0x1ae6c, and the DObj is posed from it. */
+
+/* ---- the per-frame pass for the blend (lean_controllers.c v2, "BLEND") ----------
+ * All from game.mp.i386.so md5 343f99cd67b79ac74aeaa5261f63c011, the same build as above. */
+#define RVA_BG              0x0bcfc0   /* .dynsym `bg`: { time, latestSnapshotTime,
+                                        * frametime } - G_RunFrame 0x50676..0x5069f writes
+                                        * level.time / level.frametime into it before
+                                        * anything else runs; the limiter reads its +8 */
+#define RVA_LEVEL_TIME      (0x18f220 + 0x1e8)  /* level.time, as antilag.c - log only */
+#define RVA_CLIENTINFO      0x1586cc   /* .dynsym `bgs` (0xbcfe0) + 0x9b6ec: the array
+                                        * G_PlayerController indexes (0x3aaf2..0x3aafe) */
+#define CI_STRIDE           0x4b0
+#define RVA_G_ENTITIES      0x21d6c0   /* as antilag.c / perbone_hit.c */
+#define GENTITY_SIZE        0x31c
+#define GE_ETYPE            0x04
+#define GE_CONTROLLER       0x228      /* ClientEndFrame 0x3afb6: = G_PlayerController */
+#define RVA_G_PLAYER_CTRL   0x03aacf
+#define ET_PLAYER           1
+#define MAX_POSED_CLIENTS   64
 
 /* Stance, from the gentity bounding box.
  * NOT from eFlags, and this is the one place the two sides legitimately differ. The
@@ -144,6 +166,12 @@ static int            g_yaw    = 1;   /* COD1RELOADED_POSE_SYNC_YAW=0 to disable
                                        * into the bone that carries the head. Measured. */
 static int            g_dump   = 0;   /* COD1RELOADED_CTRL_DUMP: samples per client.
                                        * Diagnostic - deliberately NOT defaulted on. */
+static int            g_blend  = 1;   /* COD1RELOADED_CTRL_BLEND=0 to disable. The
+                                       * shared movement-transition blend (v2). MUST
+                                       * match the clients: branch test/ctrl-blend
+                                       * builds have it on, every release before has it
+                                       * off - a mixed pair draws one pose and tests
+                                       * another during each movement change. */
 
 /* An unset variable means "use the built-in default", so only an explicit falsy value
  * turns something off. Written out rather than reusing the old `*e=='o'` test, which
@@ -198,12 +226,28 @@ static int lc_stance_from_box(const void* ge)
     return LC_STANCE_STAND;
 }
 
-static void hook_dc_internal(void* obj, void* es, int* partBits, void* ci, float* out)
+/* The module base a clientinfo pointer belongs to, or 0 if it is not one of ours. Used
+ * to reach `bg` (the game clock) from inside the hook without trusting g_base across the
+ * few instructions of a map-change re-install: ci always lives in the module being run. */
+static uintptr_t base_of_ci(const void* ci, int cn)
+{
+    uintptr_t b;
+    if (!ci || cn < 0 || cn >= MAX_POSED_CLIENTS) return 0;
+    b = (uintptr_t)ci - RVA_CLIENTINFO - (uintptr_t)cn * CI_STRIDE;
+    return (b == g_base) ? b : 0;
+}
+
+/* The whole server pose of one player: engine function, then the shared code - the same
+ * sequence the client runs. `blend` is LC_BLEND_PEEK from the hook (the on-demand poses,
+ * which must not move the blend state) and LC_BLEND_COMMIT from pose_sync_frame(). */
+static void pose_player(void* obj, void* es, int* partBits, void* ci, float* out,
+                        int blend, int dump)
 {
     char*         c        = (char*)ci;
     int           forced   = 0;
     float         sv_torso = 0.0f, sv_legs = 0.0f;
     lc_ctx_t      ctx;
+    uintptr_t     b;
     /* hook_install() fills hook->trampoline BEFORE it writes the JMP into the target,
      * so this fallback closes the (microscopic, watcher-thread) window in which the
      * detour is live but orig_dc_internal has not been assigned yet. If even that is
@@ -277,8 +321,14 @@ static void hook_dc_internal(void* obj, void* es, int* partBits, void* ci, float
     ctx.now_ms         = lc_now_ms();
     ctx.es             = es;
     ctx.ci             = ci;
-    ctx.dump           = g_dump;
+    ctx.dump           = dump;
     ctx.log            = lc_log_sink;
+    if (blend != LC_BLEND_OFF && es && (b = base_of_ci(ci, ctx.client_num)) != 0) {
+        ctx.blend     = blend;
+        ctx.game_time = *(const int*)(b + RVA_BG);
+        /* only on a real pose: the engine limiter right after us reads it */
+        if (blend == LC_BLEND_PEEK) ctx.control = (float*)(c + CI_CONTROL);
+    }
 
     lc_apply(out, &ctx);
 
@@ -291,6 +341,53 @@ static void hook_dc_internal(void* obj, void* es, int* partBits, void* ci, float
     if (forced) {
         *(float*)(c + CI_TORSO_YAW) = sv_torso;
         *(float*)(c + CI_LEGS_YAW)  = sv_legs;
+    }
+}
+
+static void hook_dc_internal(void* obj, void* es, int* partBits, void* ci, float* out)
+{
+    pose_player(obj, es, partBits, ci, out, g_blend ? LC_BLEND_PEEK : LC_BLEND_OFF, g_dump);
+}
+
+/* Once per server frame, after G_RunFrame (competitive_sv.c's hook calls it): advance
+ * every player's blend on the game clock, whether or not anything poses him this frame.
+ * This is what makes the tested pose independent of how often the server happens to pose
+ * a player - the engine limiter moved a whole frame per bullet trace and not at all
+ * between them, so the first shot after a quiet spell tested a pose the client had left
+ * long ago. Runs on the game thread and writes nothing of the game's: only the blend
+ * state in lean_controllers.c (ci->control is written by the next on-demand pose).
+ *
+ * The inputs are the ones a bullet between this frame and the next will see: ClientEndFrame
+ * has run for everyone (BG_PlayerAnimation updated ci, BG_PlayerStateToEntityState es), and
+ * bg.time is this frame's level.time. */
+void pose_sync_frame(uintptr_t game_base)
+{
+    static int logged = 0;
+    dc_internal_t orig;
+    int i, partBits[4];
+    float buf[LC_FLOATS];
+
+    if (!g_enable || !g_blend || !game_base || game_base != g_base) return;
+    if (*(const unsigned char*)(game_base + RVA_DC_INTERNAL) != 0xE9) return;
+    orig = orig_dc_internal ? orig_dc_internal : (dc_internal_t)g_dci_hook.trampoline;
+    if (!orig) return;
+
+    if (!logged) {
+        logged = 1;
+        printf("%s blend: per-frame pass live (bg.time %d, level.time %d - must be equal)\n",
+               TAG, *(const int*)(game_base + RVA_BG),
+               *(const int*)(game_base + RVA_LEVEL_TIME));
+        fflush(stdout);
+    }
+
+    memset(partBits, 0xff, sizeof(partBits));
+    for (i = 0; i < MAX_POSED_CLIENTS; ++i) {
+        char* ge = (char*)(game_base + RVA_G_ENTITIES) + (size_t)i * GENTITY_SIZE;
+        void* ci = (void*)(game_base + RVA_CLIENTINFO + (size_t)i * CI_STRIDE);
+        if (*(const int*)(ge + GE_ETYPE) != ET_PLAYER) continue;
+        if (*(const uintptr_t*)(ge + GE_CONTROLLER) != game_base + RVA_G_PLAYER_CTRL) continue;
+        if (*(const int*)(ge + ES_CLIENTNUM) != i) continue;
+        pose_player(ge, ge, partBits, ci, buf, LC_BLEND_COMMIT, 0);
     }
 }
 
@@ -380,6 +477,8 @@ static void try_install(void)
          * src/shared/lean_controllers.* was updated and the other was not, and every
          * alignment claim resting on them is void. */
         printf("%s shared: %s\n", TAG, lc_banner());
+        printf("%s controller blend: %s (every client's log must say the same)\n",
+               TAG, g_blend ? "ON" : "off");
         fflush(stdout);
     } else {
         printf("%s hook_install failed\n", TAG);
@@ -490,6 +589,7 @@ void pose_sync_init(void)
     warn_retired();
 
     if (env_is_off(getenv("COD1RELOADED_POSE_SYNC_YAW"))) g_yaw = 0;
+    if (env_is_off(getenv("COD1RELOADED_CTRL_BLEND")))    g_blend = 0;
 
     /* Controller-buffer dump, same variable name and same output format as the client -
      * that is the whole point, the two logs are meant to be diffed line against line.
@@ -506,8 +606,8 @@ void pose_sync_init(void)
 
     if (pthread_create(&tid, NULL, watcher_thread, NULL) == 0) {
         pthread_detach(tid);
-        printf("%s watcher started (yaw=%d dump=%d lean_const=%.2f)\n",
-               TAG, g_yaw, g_dump, g_lean_const);
+        printf("%s watcher started (yaw=%d dump=%d lean_const=%.2f blend=%d)\n",
+               TAG, g_yaw, g_dump, g_lean_const, g_blend);
         fflush(stdout);
     }
 }
