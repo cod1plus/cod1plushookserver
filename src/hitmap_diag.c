@@ -44,6 +44,74 @@
 typedef void (*loctrace_t)(void* results, const float* start, const float* end,
                            int passEnt, int mask, const unsigned char* prio);
 
+/* ---- the skeleton dump next to each map (for the visible-mesh overlay) ----------
+ * The DObj is [main model, attachments...] (G_DObjUpdate 0x6b71c): main model index =
+ * ent byte +0x179, attachment model indices = bytes +0x2f4..+0x2f9, their tags = u16
+ * script strings +0x2fa.., ignoreCollision = bit i of byte +0x17a (G_EntAttach 0x6b9b9).
+ * Bones are read BY NAME from a list in /tmp/hitmap_bones.txt with
+ * G_DObjGetWorldTagMatrix(ent, const char* name, float out[16]): the name is a C STRING
+ * (G_InitTurrets 0x510c5 / G_GetActivateEnt 0x4e15b pass a literal, and print it with %s
+ * when it is missing) and out is a 4x4 - rows 0..2 = the bone's axes in world, origin at
+ * out[12..14] (G_GetActivateEnt reads it at out+0x30). Returns 0 for a bone the DObj does
+ * not have. SL_FindLowercaseString (0 = never a string, so never a bone) skips the rest. */
+#define RVA_G_MODEL_NAME         0x06b5ae
+#define RVA_SL_CONVERT_TO_STRING 0x072cfe
+#define RVA_SL_FIND_LOWER        0x072d9a
+#define RVA_G_DOBJ_WORLD_TAG     0x06c973
+#define GE_MODEL                 0x179
+#define GE_ATTACH_IGNORECOLL     0x17a
+#define GE_ATTACH_MODEL          0x2f4
+#define GE_ATTACH_TAG            0x2fa
+typedef const char* (*g_model_name_t)(int index);
+typedef const char* (*sl_to_string_t)(unsigned int s);
+typedef unsigned short (*sl_find_lower_t)(const char* s);
+typedef int (*g_world_tag_t)(void* ent, const char* tag, float* out);
+
+static void dump_skeleton(uintptr_t base, const char* ge, const char* map_path)
+{
+    g_model_name_t  model_name = (g_model_name_t)(base + RVA_G_MODEL_NAME);
+    sl_to_string_t  to_str     = (sl_to_string_t)(base + RVA_SL_CONVERT_TO_STRING);
+    sl_find_lower_t find_lower = (sl_find_lower_t)(base + RVA_SL_FIND_LOWER);
+    g_world_tag_t   world_tag  = (g_world_tag_t)(base + RVA_G_DOBJ_WORLD_TAG);
+    char path[160], name[128];
+    FILE *in, *out;
+    int i, n = 0;
+    const int mi = *(const unsigned char*)(ge + GE_MODEL);
+
+    snprintf(path, sizeof(path), "%s.bones", map_path);
+    out = fopen(path, "w");
+    if (!out) return;
+    if (mi) fprintf(out, "MODEL 0 %s - 0\n", model_name(mi));
+    for (i = 0; i < 6; ++i) {
+        const int ai = *(const unsigned char*)(ge + GE_ATTACH_MODEL + i);
+        const unsigned short tag = *(const unsigned short*)(ge + GE_ATTACH_TAG + 2 * i);
+        const char* ts;
+        if (!ai) continue;
+        ts = tag ? to_str(tag) : "";
+        fprintf(out, "MODEL %d %s %s %d\n", i + 1, model_name(ai), (ts && ts[0]) ? ts : "-",
+                (*(const unsigned char*)(ge + GE_ATTACH_IGNORECOLL) >> i) & 1);
+    }
+    in = fopen("/tmp/hitmap_bones.txt", "r");
+    if (in) {
+        while (fgets(name, sizeof(name), in)) {
+            float m[16];
+            size_t l = strlen(name);
+            while (l && (name[l - 1] == '\n' || name[l - 1] == '\r')) name[--l] = 0;
+            if (!l || !find_lower(name)) continue;
+            memset(m, 0, sizeof(m));
+            if (!world_tag((void*)ge, name, m)) continue;
+            fprintf(out, "BONE %s|%.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.3f %.3f %.3f\n",
+                    name, m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10],
+                    m[12], m[13], m[14]);
+            ++n;
+        }
+        fclose(in);
+    }
+    fclose(out);
+    printf("[hitmap] %s: %d bones\n", path, n);
+    fflush(stdout);
+}
+
 static int  g_on = -1;
 static int  g_last_state[64];
 static int  g_last_time[64];
@@ -124,6 +192,7 @@ static void scan(uintptr_t base, int cn, const char* ge, const char* ci, int sta
     fclose(out);
     printf("[hitmap] %s written\n", path);
     fflush(stdout);
+    dump_skeleton(base, ge, path);
 }
 
 void hitmap_frame(uintptr_t base)
