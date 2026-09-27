@@ -24,6 +24,9 @@
  *                                    shared code then contributes the missing 5.0 itself,
  *                                    so the final pose is the same either way; this only
  *                                    chooses where the constant lives.
+ *   COD1RELOADED_CTRL_BLEND=0      - turn off the movement-transition blend (branch
+ *                                    test/ctrl-blend, lean_controllers.c v2). The clients
+ *                                    must be built the same way, see pose_sync_frame().
  *   COD1RELOADED_CTRL_DUMP=N       - dump N controller-buffer samples per client, in the
  *                                    same format the client writes to cod1reloaded.log,
  *                                    so the two can be diffed line against line.
@@ -43,9 +46,17 @@
 #ifndef POSE_SYNC_H
 #define POSE_SYNC_H
 
+#include <stdint.h>
+
 /* Start the watcher that installs the BG_Player_DoControllers hook on
  * game.mp.i386.so once loaded (re-installs after a map reload). No-op unless
  * COD1RELOADED_POSE_SYNC is set. Safe to call once from the .so constructor. */
 void pose_sync_init(void);
+
+/* The controller blend's once-per-frame pass (lean_controllers.c v2, "BLEND"). Call on
+ * the game thread right AFTER the real G_RunFrame, with the base of the module that ran
+ * it; it does nothing unless pose_sync's hook is live in that same module and
+ * COD1RELOADED_CTRL_BLEND is not 0. */
+void pose_sync_frame(uintptr_t game_base);
 
 #endif /* POSE_SYNC_H */

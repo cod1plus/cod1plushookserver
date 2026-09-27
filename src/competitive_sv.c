@@ -45,6 +45,7 @@
 #include "gear_force.h"
 #include "competitive_sv.h"
 #include "cheat_gate.h"
+#include "pose_sync.h"
 
 #define TAG "[competitive]"
 #define GAME_SO_NAME "game.mp.i386.so"
@@ -286,6 +287,8 @@ static void hook_G_RunFrame(int levelTime) {
     publish_if_dirty();
     cheat_gate_run_pending();         /* drops queued by the userinfo sweep thread */
     orig_runframe(levelTime);
+    pose_sync_frame(g_base);          /* the controller blend's per-frame pass: after the
+                                       * frame, when every ClientEndFrame has run */
 }
 
 static uintptr_t find_game_base(void) {
