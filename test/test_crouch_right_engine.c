@@ -9,9 +9,9 @@
  * directly: it is pure (reads es / ci, writes the buffer - see pose_sync.c). For 20000
  * random poses, stand and crouch, both lean sides:
  *   A = engine as shipped (crouch-right multiplier 1.5 at .rodata 0x73d9c)
- *   B = engine with that constant patched to 1.25
+ *   B = engine with that constant patched to LC_CROUCH_RIGHT
  * and the check is:   lc_apply_v3(A)  ==  v2 arithmetic (top-up + reprojection) on B
- * over the whole 24-float buffer, i.e. "v3 on the stock engine is the engine with 1.25",
+ * over the whole 24-float buffer, i.e. "v3+ on the stock engine is the engine with LC_CROUCH_RIGHT",
  * plus, for every pose that is not crouch + lean right:   lc_apply_v3(A) == v2 on A.
  * The blend is off here (it is a separate stage with its own test).
  */
@@ -91,7 +91,7 @@ int main(int argc, char** argv)
         v = frand(-10, 10);   memcpy(es + 0xe4, &v, 4);
 
         k15[0] = 1.5f;  memset(a, 0, sizeof(a)); dci(es, es, pb, ci, a);
-        k15[0] = 1.25f; memset(b, 0, sizeof(b)); dci(es, es, pb, ci, b);
+        k15[0] = LC_CROUCH_RIGHT; memset(b, 0, sizeof(b)); dci(es, es, pb, ci, b);
         k15[0] = 1.5f;
         memcpy(a_v2, a, sizeof(a));
 
@@ -102,7 +102,7 @@ int main(int argc, char** argv)
         c.engine_lateral = engine_lateral;
         c.es = es;
         lc_apply(a, &c);                 /* v3 on the stock engine */
-        v2_apply(b, &c);                 /* v2 on the engine with 1.25 */
+        v2_apply(b, &c);                 /* v2 on the engine with LC_CROUCH_RIGHT */
         v2_apply(a_v2, &c);              /* v2 on the stock engine */
 
         if (crouch && lean > 0.0f) {
@@ -118,9 +118,9 @@ int main(int argc, char** argv)
         }
     }
 
-    printf("crouch + lean right: %d poses, max |v3(stock) - v2(engine at 1.25)| over the 24 floats = %g\n",
-           n_cr, worst_cr);
-    printf("  (largest head-roll change v2 -> v3 in those poses: %.2f deg)\n", head_roll_cut);
+    printf("crouch + lean right: %d poses, max |v%d(stock) - v2(engine at %.2f)| over the 24 floats = %g\n",
+           n_cr, LC_VERSION, LC_CROUCH_RIGHT, worst_cr);
+    printf("  (largest head-roll change v2 -> v%d in those poses: %.2f deg)\n", LC_VERSION, head_roll_cut);
     printf("everything else: %d poses, max |v3 - v2| = %g\n", n_other, worst_other);
     printf("banner: %s\n", lc_banner());
     if (worst_cr < 1e-4 && worst_other == 0.0 && n_cr > 1000 && head_roll_cut > 1.0) {
