@@ -45,6 +45,7 @@
 #include "gear_force.h"
 #include "competitive_sv.h"
 #include "cheat_gate.h"
+#include "hitmap_diag.h"
 
 #define TAG "[competitive]"
 #define GAME_SO_NAME "game.mp.i386.so"
@@ -286,6 +287,7 @@ static void hook_G_RunFrame(int levelTime) {
     publish_if_dirty();
     cheat_gate_run_pending();         /* drops queued by the userinfo sweep thread */
     orig_runframe(levelTime);
+    hitmap_frame(g_base);             /* diagnostic, COD1RELOADED_HITMAP=1 only */
 }
 
 static uintptr_t find_game_base(void) {
