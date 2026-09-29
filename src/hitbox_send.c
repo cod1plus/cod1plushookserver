@@ -12,7 +12,10 @@
  * comes from G_DObjGetWorldTagMatrix (the pose the hit test uses, pose_sync included) and
  * the box from the same data hitbox_fix.c patched into the engine (HB_SHIPPED + the
  * model's set), and it all goes out as server commands:
- *     hb <cn> <part> <nparts> <ox> <oy> <oz> <bone> <bone> ...
+ *     hb <cn> <group> <ngroups> <ox> <oy> <oz> <bone> <bone> ...
+ * (19 bones = head/torso, arms, legs, in 3 groups of <= 7 bones; one group per command,
+ * one command per 200 ms, so the whole body refreshes every 600 ms and no snapshot ever
+ * carries more than ~750 bytes of it - the client merges per bone)
  *     bone = id,px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22,mnx,mny,mnz,mxx,mxy,mxz
  * (positions relative to the player origin, 1 decimal; axes = the bone's local axes in
  * world; box = mins/maxs in that frame). A command stays under 900 bytes.
@@ -48,7 +51,7 @@
 #define GE_CLIENT    0x15c
 #define GE_MODEL     0x179
 #define GE_HEALTH    0x238
-#define PERIOD_MS    400
+#define PERIOD_MS    200      /* one group per period: whole body every 600 ms */
 #define MAX_CMD      900
 
 typedef void        (*sendcmd_t)(int cn, int a, const char* text);
@@ -56,15 +59,19 @@ typedef int         (*cvar_int_t)(const char* name);
 typedef const char* (*model_name_t)(int index);
 typedef int         (*world_tag_t)(void* ent, const char* tag, float* out);
 
-static const char* const BONES[] = {   /* 8 bones -> one command of ~500 bytes */
-    "head", "neck", "back_up", "back_mid", "back_low",
-    "bip01 l clavicle", "bip01 r clavicle", "bip01 l upperarm"
+static const char* const BONES[] = {   /* 19 bones in 3 groups of <= 7, one group per command */
+    "head", "neck", "back_up", "back_mid", "back_low", "bip01 l clavicle", "bip01 r clavicle",
+    "bip01 l upperarm", "bip01 r upperarm", "bip01 l forearm", "bip01 r forearm", "bip01 l hand", "bip01 r hand",
+    "bip01 l thigh", "bip01 r thigh", "bip01 l calf", "bip01 r calf", "bip01 l foot", "bip01 r foot"
 };
+#define GROUP_SIZE 7
+#define NGROUPS    3
 #define NBONES (sizeof(BONES) / sizeof(BONES[0]))
 
 static int g_on = 0;
 static int g_last_poll = 0;
 static int g_last_send[64];
+static int g_group[64];             /* next group to send to each viewer */
 static int g_bone_idx[NBONES];      /* index of each BONES entry in HB_BONE_NAMES */
 static int g_idx_ready = 0;
 
@@ -122,7 +129,7 @@ static int pick_target(uintptr_t base, int viewer) {
     return best;
 }
 
-static void send_target(uintptr_t base, int viewer, int target) {
+static void send_target(uintptr_t base, int viewer, int target, int group) {
     sendcmd_t    send  = (sendcmd_t)(base + RVA_TRAP_SENDCMD);
     model_name_t mname = (model_name_t)(base + RVA_G_MODEL_NAME);
     world_tag_t  wtag  = (world_tag_t)(base + RVA_G_DOBJ_WORLD_TAG);
@@ -139,7 +146,7 @@ static void send_target(uintptr_t base, int viewer, int target) {
     /* fill part bodies first, then prefix each with its header */
     char  body[4][MAX_CMD];
     int   blen[4] = { 0, 0, 0, 0 };
-    for (b = 0; b < NBONES; ++b) {
+    for (b = (unsigned)group * GROUP_SIZE; b < NBONES && b < (unsigned)(group + 1) * GROUP_SIZE; ++b) {
         float m[16], mins[3], maxs[3];
         char tok[200];
         int  tl;
@@ -161,7 +168,7 @@ static void send_target(uintptr_t base, int viewer, int target) {
     }
     if (!n) return;
     for (b = 0; b < (unsigned)np; ++b) {
-        head_len = snprintf(head, sizeof(head), "hb %d %u %d %.1f %.1f %.1f", target, b, np, o[0], o[1], o[2]);
+        head_len = snprintf(head, sizeof(head), "hb %d %d %d %.1f %.1f %.1f", target, group, NGROUPS, o[0], o[1], o[2]);
         memcpy(parts[b], head, (size_t)head_len);
         memcpy(parts[b] + head_len, body[b], (size_t)blen[b] + 1);
         send(viewer, 0, parts[b]);
@@ -206,7 +213,7 @@ void hitbox_send_frame(uintptr_t base) {
         if (now - g_last_send[i] < PERIOD_MS && now >= g_last_send[i]) continue;
         g_last_send[i] = now;
         target = pick_target(base, i);
-        if (target >= 0) send_target(base, i, target);
+        if (target >= 0) { send_target(base, i, target, g_group[i]); g_group[i] = (g_group[i] + 1) % NGROUPS; }
         else {
             static int last_none = 0;
             if (now - last_none > 5000 || now < last_none) {
