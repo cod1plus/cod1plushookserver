@@ -22,9 +22,7 @@ static const hb_fix_t HB_FIX_USAirborne3[] = {
     { 22, { -1.588f, -3.796f, -3.145f }, { 4.830f, 10.030f, 3.051f } }, /* bip01 l foot +0.3 */
     { 23, { -1.613f, -3.795f, -2.938f }, { 4.805f, 10.061f, 3.373f } }, /* bip01 r foot +0.4 */
     { 25, { -1.429f, -6.740f, -8.184f }, { 5.480f, 7.353f, 8.685f } }, /* back_up +1.0 */
-    { 30, { -1.609f, -4.078f, -5.522f }, { 8.905f, 5.997f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.813f, -3.487f, -5.090f }, { 8.306f, 6.946f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -3.777f, -2.981f }, { 12.781f, 3.962f, 4.043f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.106f, -4.472f, -2.923f }, { 12.158f, 4.581f, 4.415f } }, /* bip01 r upperarm +1.0 */
@@ -73,9 +71,7 @@ static const hb_fix_t HB_FIX_british_airborne3[] = {
     { 22, { -1.588f, -3.789f, -3.102f }, { 4.830f, 10.030f, 3.010f } }, /* bip01 l foot +0.2 */
     { 23, { -1.613f, -3.758f, -2.818f }, { 4.805f, 10.061f, 3.073f } }, /* bip01 r foot +0.3 */
     { 25, { -1.341f, -6.739f, -8.615f }, { 5.480f, 7.062f, 8.794f } }, /* back_up +1.0 */
-    { 30, { -1.609f, -3.936f, -5.522f }, { 8.931f, 5.997f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.370f, -3.993f, -5.090f }, { 8.306f, 6.946f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -3.869f, -2.981f }, { 12.781f, 3.968f, 4.043f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.824f, -4.162f, -2.923f }, { 12.158f, 4.581f, 3.755f } }, /* bip01 r upperarm +1.0 */
@@ -124,9 +120,7 @@ static const hb_fix_t HB_FIX_british_commando3[] = {
     { 22, { -1.588f, -3.789f, -3.102f }, { 4.830f, 10.030f, 3.010f } }, /* bip01 l foot +0.2 */
     { 23, { -1.613f, -3.758f, -2.818f }, { 4.805f, 10.061f, 3.073f } }, /* bip01 r foot +0.3 */
     { 25, { -1.341f, -6.726f, -8.184f }, { 5.480f, 6.838f, 8.314f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.075f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -1.684f, -4.008f, -5.090f }, { 8.306f, 6.196f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -3.777f, -2.981f }, { 12.031f, 3.968f, 3.101f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.106f, -3.838f, -2.923f }, { 12.158f, 3.968f, 3.711f } }, /* bip01 r upperarm +0.4 */
@@ -175,9 +169,7 @@ static const hb_fix_t HB_FIX_british_commando_winter3[] = {
     { 22, { -1.588f, -3.789f, -3.102f }, { 4.830f, 10.030f, 3.010f } }, /* bip01 l foot +0.2 */
     { 23, { -1.613f, -3.758f, -2.818f }, { 4.805f, 10.061f, 3.073f } }, /* bip01 r foot +0.3 */
     { 25, { -1.418f, -7.110f, -8.343f }, { 5.480f, 7.100f, 8.455f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.241f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.063f, -3.487f, -5.090f }, { 8.306f, 6.196f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -3.777f, -2.981f }, { 12.031f, 3.968f, 3.101f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.161f, -4.472f, -2.923f }, { 12.158f, 4.581f, 3.794f } }, /* bip01 r upperarm +1.0 */
@@ -226,9 +218,7 @@ static const hb_fix_t HB_FIX_USAirborneAHigh3[] = {
     { 22, { -1.588f, -3.796f, -3.145f }, { 4.830f, 10.030f, 3.051f } }, /* bip01 l foot +0.3 */
     { 23, { -1.613f, -3.795f, -2.938f }, { 4.805f, 10.061f, 3.373f } }, /* bip01 r foot +0.4 */
     { 25, { -1.429f, -6.739f, -8.184f }, { 5.480f, 7.353f, 8.685f } }, /* back_up +1.0 */
-    { 30, { -1.609f, -4.078f, -5.522f }, { 8.905f, 5.997f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.813f, -3.487f, -5.090f }, { 8.306f, 6.946f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -3.777f, -2.981f }, { 12.781f, 3.962f, 4.043f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.106f, -4.472f, -2.923f }, { 12.158f, 4.581f, 4.415f } }, /* bip01 r upperarm +1.0 */
@@ -277,9 +267,7 @@ static const hb_fix_t HB_FIX_FallschirmAhigh3[] = {
     { 22, { -1.588f, -3.796f, -3.145f }, { 4.830f, 10.030f, 3.051f } }, /* bip01 l foot +0.3 */
     { 23, { -1.613f, -3.795f, -2.938f }, { 4.805f, 10.061f, 3.373f } }, /* bip01 r foot +0.4 */
     { 25, { -1.341f, -6.739f, -8.184f }, { 5.480f, 6.840f, 8.256f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.436f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.063f, -3.487f, -5.090f }, { 8.306f, 6.946f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -3.777f, -2.981f }, { 12.781f, 3.968f, 4.043f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.106f, -4.472f, -2.923f }, { 12.158f, 3.968f, 3.771f } }, /* bip01 r upperarm +1.0 */
@@ -324,16 +312,14 @@ static const hb_fix_t HB_FIX_german_kriegsmarine3[] = {
     {  7, { -7.864f, -6.189f, -8.326f }, { 7.152f, 7.171f, 9.165f } }, /* back_low +0.4 */
     { 16, { -0.306f, -5.774f, -3.685f }, { 14.504f, 3.419f, 3.497f } }, /* bip01 l calf +1.0 */
     { 17, { -0.528f, -5.827f, -3.506f }, { 14.437f, 3.366f, 3.676f } }, /* bip01 r calf +1.0 */
-    { 19, { 0.857f, -6.236f, -7.367f }, { 4.724f, 6.422f, 7.420f } }, /* back_mid +1.0 */
+    { 19, { 0.857f, -6.236f, -7.367f }, { 4.724f, 6.422f, 7.535f } }, /* back_mid +1.0 */
     { 22, { -1.588f, -4.539f, -3.654f }, { 4.830f, 10.030f, 3.449f } }, /* bip01 l foot +1.0 */
     { 23, { -1.613f, -4.508f, -3.458f }, { 4.805f, 10.061f, 3.646f } }, /* bip01 r foot +1.0 */
     { 25, { -1.341f, -6.726f, -8.184f }, { 5.480f, 6.838f, 8.256f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.075f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -1.870f, -4.008f, -5.090f }, { 8.306f, 6.196f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -3.777f, -2.875f }, { 12.031f, 4.072f, 3.373f } }, /* bip01 l upperarm +0.9 */
-    { 41, { -1.282f, -4.447f, -2.865f }, { 12.158f, 4.076f, 3.665f } }, /* bip01 r upperarm +1.0 */
+    { 41, { -1.282f, -4.472f, -2.865f }, { 12.158f, 4.076f, 3.665f } }, /* bip01 r upperarm +1.0 */
     { 42, { -1.865f, -3.389f, -3.147f }, { 12.544f, 4.139f, 2.827f } }, /* bip01 l forearm +1.0 */
     { 43, { -2.170f, -3.389f, -3.090f }, { 11.786f, 4.139f, 2.883f } }, /* bip01 r forearm +1.0 */
     { 45, { -2.005f, -1.475f, -2.533f }, { 4.281f, 1.672f, 2.726f } }, /* bip01 l hand +1.0 */
@@ -379,11 +365,9 @@ static const hb_fix_t HB_FIX_german_waffenSS_clean3[] = {
     { 22, { -1.588f, -3.789f, -3.102f }, { 4.830f, 10.030f, 3.010f } }, /* bip01 l foot +0.2 */
     { 23, { -1.613f, -3.758f, -2.818f }, { 4.805f, 10.061f, 3.073f } }, /* bip01 r foot +0.3 */
     { 25, { -1.418f, -7.110f, -8.184f }, { 5.480f, 7.155f, 9.006f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.241f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.063f, -4.175f, -5.090f }, { 8.306f, 6.196f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
-    { 40, { -1.233f, -4.248f, -2.981f }, { 12.031f, 3.968f, 3.834f } }, /* bip01 l upperarm +1.0 */
+    { 40, { -1.233f, -4.500f, -2.981f }, { 12.031f, 3.968f, 3.834f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.106f, -4.472f, -2.923f }, { 12.158f, 3.968f, 4.415f } }, /* bip01 r upperarm +1.0 */
     { 42, { -2.086f, -3.190f, -3.650f }, { 12.544f, 4.139f, 3.266f } }, /* bip01 l forearm +1.0 */
     { 43, { -2.170f, -3.155f, -3.652f }, { 11.786f, 4.139f, 3.049f } }, /* bip01 r forearm +1.0 */
@@ -430,9 +414,7 @@ static const hb_fix_t HB_FIX_german_waffenSS_w3[] = {
     { 22, { -1.588f, -3.789f, -3.102f }, { 4.830f, 10.030f, 3.010f } }, /* bip01 l foot +0.2 */
     { 23, { -1.613f, -3.758f, -2.818f }, { 4.805f, 10.061f, 3.073f } }, /* bip01 r foot +0.3 */
     { 25, { -1.418f, -7.110f, -8.918f }, { 5.480f, 7.150f, 9.006f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.204f, -5.522f }, { 8.934f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.063f, -3.487f, -5.090f }, { 8.306f, 6.946f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.983f, -3.777f, -2.804f }, { 12.031f, 4.134f, 3.834f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.856f, -4.472f, -3.215f }, { 12.158f, 4.581f, 3.978f } }, /* bip01 r upperarm +1.0 */
@@ -481,12 +463,10 @@ static const hb_fix_t HB_FIX_german_WehrmactA3[] = {
     { 22, { -1.588f, -3.789f, -3.102f }, { 4.830f, 10.030f, 3.010f } }, /* bip01 l foot +0.2 */
     { 23, { -1.613f, -3.758f, -2.818f }, { 4.805f, 10.061f, 3.073f } }, /* bip01 r foot +0.3 */
     { 25, { -1.341f, -6.892f, -8.184f }, { 5.480f, 6.838f, 8.340f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.011f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.063f, -3.487f, -5.090f }, { 8.306f, 6.196f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
-    { 40, { -0.943f, -3.777f, -2.981f }, { 12.781f, 3.777f, 3.834f } }, /* bip01 l upperarm +1.0 */
-    { 41, { -1.733f, -4.472f, -2.971f }, { 12.158f, 4.526f, 4.415f } }, /* bip01 r upperarm +1.0 */
+    { 40, { -1.233f, -3.777f, -2.981f }, { 12.781f, 3.777f, 3.834f } }, /* bip01 l upperarm +1.0 */
+    { 41, { -1.856f, -4.472f, -2.971f }, { 12.158f, 4.526f, 4.415f } }, /* bip01 r upperarm +1.0 */
     { 42, { -2.085f, -3.389f, -3.650f }, { 12.544f, 4.139f, 3.162f } }, /* bip01 l forearm +1.0 */
     { 43, { -2.170f, -3.389f, -3.652f }, { 11.786f, 4.139f, 3.049f } }, /* bip01 r forearm +1.0 */
     { 45, { -2.005f, -1.882f, -2.533f }, { 4.281f, 1.443f, 2.726f } }, /* bip01 l hand +1.0 */
@@ -532,9 +512,7 @@ static const hb_fix_t HB_FIX_german_wehrmact_winter3[] = {
     { 22, { -1.588f, -3.789f, -3.102f }, { 4.830f, 10.030f, 3.010f } }, /* bip01 l foot +0.2 */
     { 23, { -1.613f, -3.758f, -2.818f }, { 4.805f, 10.061f, 3.073f } }, /* bip01 r foot +0.3 */
     { 25, { -1.418f, -7.110f, -8.918f }, { 5.480f, 7.150f, 9.006f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.204f, -5.522f }, { 8.934f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.063f, -3.487f, -5.090f }, { 8.306f, 6.946f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.983f, -3.777f, -2.804f }, { 12.031f, 4.134f, 3.834f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.856f, -4.472f, -3.215f }, { 12.158f, 4.581f, 3.978f } }, /* bip01 r upperarm +1.0 */
@@ -583,9 +561,7 @@ static const hb_fix_t HB_FIX_character_soviet_overcoat13[] = {
     { 22, { -1.588f, -4.066f, -3.130f }, { 4.830f, 10.030f, 3.072f } }, /* bip01 l foot +0.5 */
     { 23, { -1.613f, -4.066f, -3.100f }, { 4.805f, 10.061f, 3.361f } }, /* bip01 r foot +0.6 */
     { 25, { -1.341f, -6.758f, -8.551f }, { 5.480f, 6.840f, 8.730f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.253f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -1.721f, -4.186f, -5.090f }, { 8.306f, 6.196f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -4.527f, -2.981f }, { 12.031f, 3.784f, 3.822f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.106f, -4.472f, -3.241f }, { 12.158f, 4.581f, 3.950f } }, /* bip01 r upperarm +1.0 */
@@ -634,9 +610,7 @@ static const hb_fix_t HB_FIX_character_soviet_overcoat_w3[] = {
     { 22, { -1.588f, -4.066f, -3.130f }, { 4.830f, 10.030f, 3.072f } }, /* bip01 l foot +0.5 */
     { 23, { -1.613f, -4.066f, -3.100f }, { 4.805f, 10.061f, 3.361f } }, /* bip01 r foot +0.6 */
     { 25, { -1.341f, -6.758f, -8.551f }, { 5.480f, 6.840f, 8.730f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.252f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -1.721f, -4.185f, -5.090f }, { 8.306f, 6.196f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -4.527f, -2.981f }, { 12.031f, 3.783f, 3.822f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.106f, -4.472f, -3.241f }, { 12.158f, 4.581f, 3.950f } }, /* bip01 r upperarm +1.0 */
@@ -685,12 +659,10 @@ static const hb_fix_t HB_FIX_character_soviet_coat3[] = {
     { 22, { -1.588f, -3.795f, -3.113f }, { 4.830f, 10.030f, 3.010f } }, /* bip01 l foot +0.3 */
     { 23, { -1.613f, -3.795f, -2.821f }, { 4.805f, 10.061f, 3.072f } }, /* bip01 r foot +0.3 */
     { 25, { -1.418f, -7.110f, -8.184f }, { 5.480f, 7.150f, 8.256f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -3.923f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.063f, -3.487f, -5.090f }, { 8.306f, 6.196f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -3.777f, -2.981f }, { 12.031f, 3.968f, 3.101f } }, /* bip01 l upperarm +1.0 */
-    { 41, { -1.106f, -4.394f, -2.923f }, { 12.158f, 3.968f, 3.776f } }, /* bip01 r upperarm +0.9 */
+    { 41, { -1.106f, -4.472f, -2.923f }, { 12.158f, 3.968f, 3.776f } }, /* bip01 r upperarm +1.0 */
     { 42, { -2.086f, -3.386f, -3.650f }, { 12.583f, 4.139f, 3.011f } }, /* bip01 l forearm +1.0 */
     { 43, { -2.170f, -3.389f, -3.283f }, { 11.786f, 4.139f, 3.455f } }, /* bip01 r forearm +1.0 */
     { 45, { -2.005f, -1.882f, -2.533f }, { 4.281f, 0.922f, 2.464f } }, /* bip01 l hand +1.0 */
@@ -736,12 +708,10 @@ static const hb_fix_t HB_FIX_character_soviet_coat_w3[] = {
     { 22, { -1.588f, -3.795f, -3.113f }, { 4.830f, 10.030f, 3.010f } }, /* bip01 l foot +0.3 */
     { 23, { -1.613f, -3.795f, -2.821f }, { 4.805f, 10.061f, 3.072f } }, /* bip01 r foot +0.3 */
     { 25, { -1.418f, -7.110f, -8.184f }, { 5.480f, 7.150f, 8.256f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -3.923f, -5.522f }, { 8.760f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.063f, -3.487f, -5.090f }, { 8.306f, 6.196f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.233f, -3.777f, -2.981f }, { 12.031f, 3.968f, 3.101f } }, /* bip01 l upperarm +1.0 */
-    { 41, { -1.106f, -4.394f, -2.923f }, { 12.158f, 3.968f, 3.776f } }, /* bip01 r upperarm +0.9 */
+    { 41, { -1.106f, -4.472f, -2.923f }, { 12.158f, 3.968f, 3.776f } }, /* bip01 r upperarm +1.0 */
     { 42, { -2.086f, -3.386f, -3.650f }, { 12.583f, 4.139f, 3.011f } }, /* bip01 l forearm +1.0 */
     { 43, { -2.170f, -3.389f, -3.283f }, { 11.786f, 4.139f, 3.455f } }, /* bip01 r forearm +1.0 */
     { 45, { -2.005f, -1.882f, -2.533f }, { 4.281f, 0.922f, 2.464f } }, /* bip01 l hand +1.0 */
@@ -787,9 +757,7 @@ static const hb_fix_t HB_FIX_universal[] = {
     { 22, { -1.588f, -4.539f, -3.654f }, { 4.830f, 10.030f, 3.449f } }, /* bip01 l foot +1.0 */
     { 23, { -1.613f, -4.508f, -3.458f }, { 4.805f, 10.061f, 3.646f } }, /* bip01 r foot +1.0 */
     { 25, { -1.429f, -7.110f, -8.918f }, { 5.480f, 7.353f, 9.006f } }, /* back_up +1.0 */
-    { 30, { -2.359f, -4.436f, -5.522f }, { 8.934f, 6.747f, 5.053f } }, /* bip01 l clavicle +1.0 */
     { 33, { -0.250f, -2.796f, -2.821f }, { 3.414f, 3.525f, 2.821f } }, /* neck +0.2 */
-    { 34, { -2.813f, -4.186f, -5.090f }, { 8.306f, 6.946f, 5.485f } }, /* bip01 r clavicle +1.0 */
     { 39, { -0.609f, -4.736f, -3.813f }, { 10.624f, 5.867f, 3.813f } }, /* head +0.2 */
     { 40, { -1.983f, -4.527f, -2.981f }, { 12.781f, 4.134f, 4.043f } }, /* bip01 l upperarm +1.0 */
     { 41, { -1.856f, -4.472f, -3.241f }, { 12.158f, 4.581f, 4.415f } }, /* bip01 r upperarm +1.0 */
@@ -830,24 +798,24 @@ static const hb_fix_t HB_FIX_universal[] = {
 };
 
 static const hb_set_t HB_SETS[] = {
-    { "USAirborne3", 49, HB_FIX_USAirborne3 }, /* playerbody_american_airborne, playerbody_american_airborne_winter */
-    { "british_airborne3", 49, HB_FIX_british_airborne3 }, /* playerbody_british_airborne */
-    { "british_commando3", 49, HB_FIX_british_commando3 }, /* playerbody_british_commando */
-    { "british_commando_winter3", 49, HB_FIX_british_commando_winter3 }, /* playerbody_british_commando_winter */
-    { "USAirborneAHigh3", 49, HB_FIX_USAirborneAHigh3 }, /* playerbody_default */
-    { "FallschirmAhigh3", 49, HB_FIX_FallschirmAhigh3 }, /* playerbody_german_fallschirmjagercamo, playerbody_german_fallschirmjagergrey */
-    { "german_kriegsmarine3", 49, HB_FIX_german_kriegsmarine3 }, /* playerbody_german_kriegsmarine */
-    { "german_waffenSS_clean3", 49, HB_FIX_german_waffenSS_clean3 }, /* playerbody_german_waffen */
-    { "german_waffenSS_w3", 49, HB_FIX_german_waffenSS_w3 }, /* playerbody_german_waffen_winter */
-    { "german_WehrmactA3", 49, HB_FIX_german_WehrmactA3 }, /* playerbody_german_wehrmacht */
-    { "german_wehrmact_winter3", 49, HB_FIX_german_wehrmact_winter3 }, /* playerbody_german_wehrmacht_winter */
-    { "character_soviet_overcoat13", 49, HB_FIX_character_soviet_overcoat13 }, /* playerbody_russian_conscript */
-    { "character_soviet_overcoat_w3", 49, HB_FIX_character_soviet_overcoat_w3 }, /* playerbody_russian_conscript_winter */
-    { "character_soviet_coat3", 49, HB_FIX_character_soviet_coat3 }, /* playerbody_russian_veteran */
-    { "character_soviet_coat_w3", 49, HB_FIX_character_soviet_coat_w3 }, /* playerbody_russian_veteran_winter */
+    { "USAirborne3", 47, HB_FIX_USAirborne3 }, /* playerbody_american_airborne, playerbody_american_airborne_winter */
+    { "british_airborne3", 47, HB_FIX_british_airborne3 }, /* playerbody_british_airborne */
+    { "british_commando3", 47, HB_FIX_british_commando3 }, /* playerbody_british_commando */
+    { "british_commando_winter3", 47, HB_FIX_british_commando_winter3 }, /* playerbody_british_commando_winter */
+    { "USAirborneAHigh3", 47, HB_FIX_USAirborneAHigh3 }, /* playerbody_default */
+    { "FallschirmAhigh3", 47, HB_FIX_FallschirmAhigh3 }, /* playerbody_german_fallschirmjagercamo, playerbody_german_fallschirmjagergrey */
+    { "german_kriegsmarine3", 47, HB_FIX_german_kriegsmarine3 }, /* playerbody_german_kriegsmarine */
+    { "german_waffenSS_clean3", 47, HB_FIX_german_waffenSS_clean3 }, /* playerbody_german_waffen */
+    { "german_waffenSS_w3", 47, HB_FIX_german_waffenSS_w3 }, /* playerbody_german_waffen_winter */
+    { "german_WehrmactA3", 47, HB_FIX_german_WehrmactA3 }, /* playerbody_german_wehrmacht */
+    { "german_wehrmact_winter3", 47, HB_FIX_german_wehrmact_winter3 }, /* playerbody_german_wehrmacht_winter */
+    { "character_soviet_overcoat13", 47, HB_FIX_character_soviet_overcoat13 }, /* playerbody_russian_conscript */
+    { "character_soviet_overcoat_w3", 47, HB_FIX_character_soviet_overcoat_w3 }, /* playerbody_russian_conscript_winter */
+    { "character_soviet_coat3", 47, HB_FIX_character_soviet_coat3 }, /* playerbody_russian_veteran */
+    { "character_soviet_coat_w3", 47, HB_FIX_character_soviet_coat_w3 }, /* playerbody_russian_veteran_winter */
 };
 #define HB_NUM_SETS (sizeof(HB_SETS) / sizeof(HB_SETS[0]))
-static const hb_set_t HB_UNIVERSAL = { "universal", 49, HB_FIX_universal };
+static const hb_set_t HB_UNIVERSAL = { "universal", 47, HB_FIX_universal };
 
 static const hb_lookup_t HB_LOOKUP[] = {
     { "playerbody_american_airborne", 0 },
