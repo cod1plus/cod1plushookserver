@@ -870,4 +870,170 @@ static const hb_lookup_t HB_LOOKUP[] = {
 };
 #define HB_NUM_LOOKUP (sizeof(HB_LOOKUP) / sizeof(HB_LOOKUP[0]))
 
+/* the 80 shipped boxes (all bodies) and the bone names, xmodelparts order */
+static const float HB_SHIPPED[HB_NBONES][6] = {
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_origin */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* bip01 pelvis */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* pelvis */
+    { 0.000f, -5.884f, -4.312f, 20.223f, 4.901f, 4.218f }, /* bip01 l thigh */
+    { 0.000f, -5.906f, -4.117f, 20.225f, 4.879f, 4.412f }, /* bip01 r thigh */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* torso_stabilizer */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* bip01 spine */
+    { -7.614f, -5.939f, -8.728f, 6.902f, 6.777f, 8.915f }, /* back_low */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_belt_back */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_belt_backleft */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_belt_backright */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_belt_front */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_belt_frontleft */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_belt_frontright */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_belt_left */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_belt_right */
+    { -1.917f, -4.774f, -3.829f, 14.254f, 3.169f, 3.900f }, /* bip01 l calf */
+    { -1.984f, -4.827f, -3.693f, 14.187f, 3.116f, 4.036f }, /* bip01 r calf */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* bip01 spine1 */
+    { -1.602f, -5.999f, -8.109f, 3.724f, 5.999f, 7.285f }, /* back_mid */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_thigh_left */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_thigh_right */
+    { -1.338f, -3.539f, -2.863f, 4.580f, 9.780f, 2.760f }, /* bip01 l foot */
+    { -1.363f, -3.508f, -2.500f, 4.555f, 9.811f, 3.123f }, /* bip01 r foot */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* bip01 spine2 */
+    { -1.091f, -6.110f, -7.934f, 4.480f, 6.588f, 8.006f }, /* back_up */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_calf_left */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_calf_right */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_shin_left */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_shin_right */
+    { -1.359f, -3.436f, -5.272f, 8.510f, 5.747f, 4.053f }, /* bip01 l clavicle */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* bip01 l toe0 */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* bip01 neck */
+    { -0.000f, -2.546f, -2.571f, 3.164f, 3.275f, 2.571f }, /* neck */
+    { -1.813f, -3.237f, -4.090f, 8.056f, 5.946f, 5.235f }, /* bip01 r clavicle */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* bip01 r toe0 */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_breastpocket_left */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_breastpocket_right */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* bip01 head */
+    { -0.359f, -4.486f, -3.563f, 10.374f, 5.617f, 3.563f }, /* head */
+    { -0.983f, -3.527f, -1.981f, 11.781f, 3.527f, 4.049f }, /* bip01 l upperarm */
+    { -0.856f, -3.472f, -2.615f, 11.908f, 3.581f, 3.415f }, /* bip01 r upperarm */
+    { -1.122f, -3.139f, -3.400f, 12.333f, 3.139f, 2.266f }, /* bip01 l forearm */
+    { -1.920f, -3.139f, -3.033f, 11.536f, 3.139f, 2.633f }, /* bip01 r forearm */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_helmet */
+    { -1.005f, -1.225f, -2.283f, 4.031f, 0.672f, 2.214f }, /* bip01 l hand */
+    { -0.876f, -1.238f, -2.215f, 4.039f, 0.656f, 2.278f }, /* bip01 r hand */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_helmetside */
+    { 0.000f, -1.467f, -1.222f, 2.565f, 0.546f, 0.588f }, /* bip01 l finger0 */
+    { 0.000f, -0.556f, -0.539f, 1.624f, 0.500f, 0.422f }, /* bip01 l finger1 */
+    { 0.000f, -0.576f, -0.571f, 1.856f, 0.419f, 0.572f }, /* bip01 l finger2 */
+    { 0.000f, -0.706f, -0.429f, 1.646f, 0.354f, 0.513f }, /* bip01 l finger3 */
+    { -0.089f, -0.652f, -0.318f, 1.151f, 0.425f, 0.684f }, /* bip01 l finger4 */
+    { 0.000f, -1.462f, -0.492f, 2.220f, 0.557f, 1.211f }, /* bip01 r finger0 */
+    { 0.000f, -0.567f, -0.431f, 1.634f, 0.489f, 0.530f }, /* bip01 r finger1 */
+    { 0.000f, -0.651f, -0.578f, 1.862f, 0.403f, 0.566f }, /* bip01 r finger2 */
+    { 0.000f, -0.595f, -0.517f, 1.650f, 0.487f, 0.425f }, /* bip01 r finger3 */
+    { 0.000f, -0.549f, -0.667f, 1.154f, 0.409f, 0.313f }, /* bip01 r finger4 */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_weapon_left */
+    { 0.000f, 0.000f, 0.000f, 0.000f, 0.000f, 0.000f }, /* tag_weapon_right */
+    { 0.000f, -0.787f, -0.902f, 1.646f, 0.259f, 0.471f }, /* bip01 l finger01 */
+    { 0.000f, -0.434f, -0.546f, 1.078f, 0.346f, 0.447f }, /* bip01 l finger11 */
+    { -0.148f, -0.484f, -0.573f, 0.995f, 0.388f, 0.571f }, /* bip01 l finger21 */
+    { -0.062f, -0.359f, -0.431f, 0.964f, 0.472f, 0.511f }, /* bip01 l finger31 */
+    { -0.160f, -0.328f, -0.301f, 0.539f, 0.441f, 0.550f }, /* bip01 l finger41 */
+    { -0.157f, -0.774f, -0.599f, 1.642f, 0.273f, 0.892f }, /* bip01 r finger01 */
+    { 0.000f, -0.449f, -0.456f, 1.077f, 0.331f, 0.537f }, /* bip01 r finger11 */
+    { -0.160f, -0.496f, -0.576f, 0.984f, 0.376f, 0.568f }, /* bip01 r finger21 */
+    { -0.074f, -0.371f, -0.515f, 0.953f, 0.460f, 0.427f }, /* bip01 r finger31 */
+    { -0.171f, -0.341f, -0.555f, 0.528f, 0.429f, 0.296f }, /* bip01 r finger41 */
+    { 0.000f, -0.758f, -0.674f, 1.543f, 0.143f, 0.530f }, /* bip01 l finger02 */
+    { 0.000f, -0.394f, -0.511f, 1.015f, 0.297f, 0.427f }, /* bip01 l finger12 */
+    { -0.147f, -0.467f, -0.447f, 0.733f, 0.214f, 0.538f }, /* bip01 l finger22 */
+    { 0.000f, -0.362f, -0.408f, 0.799f, 0.283f, 0.515f }, /* bip01 l finger32 */
+    { -0.135f, -0.267f, -0.241f, 0.590f, 0.399f, 0.520f }, /* bip01 l finger42 */
+    { 0.000f, -0.744f, -0.540f, 1.544f, 0.156f, 0.663f }, /* bip01 r finger02 */
+    { 0.000f, -0.407f, -0.436f, 1.007f, 0.284f, 0.503f }, /* bip01 r finger12 */
+    { -0.162f, -0.473f, -0.544f, 0.718f, 0.208f, 0.441f }, /* bip01 r finger22 */
+    { 0.000f, -0.369f, -0.519f, 0.784f, 0.275f, 0.404f }, /* bip01 r finger32 */
+    { -0.197f, -0.272f, -0.525f, 0.574f, 0.300f, 0.232f }, /* bip01 r finger42 */
+};
+static const char* const HB_BONE_NAMES[HB_NBONES] = {
+    "tag_origin",
+    "bip01 pelvis",
+    "pelvis",
+    "bip01 l thigh",
+    "bip01 r thigh",
+    "torso_stabilizer",
+    "bip01 spine",
+    "back_low",
+    "tag_belt_back",
+    "tag_belt_backleft",
+    "tag_belt_backright",
+    "tag_belt_front",
+    "tag_belt_frontleft",
+    "tag_belt_frontright",
+    "tag_belt_left",
+    "tag_belt_right",
+    "bip01 l calf",
+    "bip01 r calf",
+    "bip01 spine1",
+    "back_mid",
+    "tag_thigh_left",
+    "tag_thigh_right",
+    "bip01 l foot",
+    "bip01 r foot",
+    "bip01 spine2",
+    "back_up",
+    "tag_calf_left",
+    "tag_calf_right",
+    "tag_shin_left",
+    "tag_shin_right",
+    "bip01 l clavicle",
+    "bip01 l toe0",
+    "bip01 neck",
+    "neck",
+    "bip01 r clavicle",
+    "bip01 r toe0",
+    "tag_breastpocket_left",
+    "tag_breastpocket_right",
+    "bip01 head",
+    "head",
+    "bip01 l upperarm",
+    "bip01 r upperarm",
+    "bip01 l forearm",
+    "bip01 r forearm",
+    "tag_helmet",
+    "bip01 l hand",
+    "bip01 r hand",
+    "tag_helmetside",
+    "bip01 l finger0",
+    "bip01 l finger1",
+    "bip01 l finger2",
+    "bip01 l finger3",
+    "bip01 l finger4",
+    "bip01 r finger0",
+    "bip01 r finger1",
+    "bip01 r finger2",
+    "bip01 r finger3",
+    "bip01 r finger4",
+    "tag_weapon_left",
+    "tag_weapon_right",
+    "bip01 l finger01",
+    "bip01 l finger11",
+    "bip01 l finger21",
+    "bip01 l finger31",
+    "bip01 l finger41",
+    "bip01 r finger01",
+    "bip01 r finger11",
+    "bip01 r finger21",
+    "bip01 r finger31",
+    "bip01 r finger41",
+    "bip01 l finger02",
+    "bip01 l finger12",
+    "bip01 l finger22",
+    "bip01 l finger32",
+    "bip01 l finger42",
+    "bip01 r finger02",
+    "bip01 r finger12",
+    "bip01 r finger22",
+    "bip01 r finger32",
+    "bip01 r finger42",
+};
+
 #endif

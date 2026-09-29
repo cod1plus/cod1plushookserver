@@ -125,6 +125,8 @@ static char loc_char(int loc)
     return (loc >= 0 && loc < 19) ? c[loc] : '?';
 }
 
+static const char* g_scan_tag = NULL;   /* set by hitmap_scan_shot for the file name */
+
 static void scan(uintptr_t base, int cn, const char* ge, const char* ci, int state)
 {
     loctrace_t tr = (loctrace_t)(base + RVA_TRAP_LOC_TRACE);
@@ -140,8 +142,11 @@ static void scan(uintptr_t base, int cn, const char* ge, const char* ci, int sta
 
     memcpy(&leanf, ge + GE_LEANF, 4);
     memcpy(&ef, ge + GE_EFLAGS, 4);
-    snprintf(path, sizeof(path), "/tmp/hitmap_%d_%s_lean%+d.txt", cn,
-             (ef & 0x40) ? "prone" : (ef & 0x20) ? "crouch" : "stand", state % 10 - 3);
+    if (g_scan_tag)
+        snprintf(path, sizeof(path), "/tmp/hitmap_shot_%s_%d.txt", g_scan_tag, cn);
+    else
+        snprintf(path, sizeof(path), "/tmp/hitmap_%d_%s_lean%+d.txt", cn,
+                 (ef & 0x40) ? "prone" : (ef & 0x20) ? "crouch" : "stand", state % 10 - 3);
     out = fopen(path, "w");
     if (!out) return;
     fprintf(out, "cn %d  eFlags 0x%x  leanf %+.3f  yaw %.1f  origin %.1f %.1f %.1f  level.time %d\n"
@@ -231,4 +236,15 @@ void hitmap_frame(uintptr_t base)
         g_last_time[i] = now;
         scan(base, i, ge, ci, state);
     }
+}
+
+void hitmap_scan_shot(uintptr_t base, int cn, const char* tag)
+{
+    const char* ge = (const char*)(base + RVA_G_ENTITIES) + (size_t)cn * GENTITY_SIZE;
+    const char* ci = (const char*)(base + RVA_CLIENTINFO) + (size_t)cn * CI_STRIDE;
+    if (!base || cn < 0 || cn >= 64) return;
+    if (*(const int*)(ge + GE_ETYPE) != 1 || *(const int*)(ge + GE_CLIENTNUM) != cn) return;
+    g_scan_tag = tag;
+    scan(base, cn, ge, ci, 0);
+    g_scan_tag = NULL;
 }

@@ -46,6 +46,7 @@
 #include "competitive_sv.h"
 #include "cheat_gate.h"
 #include "pose_sync.h"
+#include "hitbox_send.h"
 #include "hitmap_diag.h"
 #include "netstat_sv.h"
 
@@ -293,6 +294,7 @@ static void hook_G_RunFrame(int levelTime) {
     hitmap_frame(g_base);             /* diagnostic, COD1RELOADED_HITMAP=1 only */
     pose_sync_frame(g_base);          /* the controller blend's per-frame pass: after the
                                        * frame, when every ClientEndFrame has run */
+    hitbox_send_frame(g_base);        /* server cvar cod1x_drawhitbox: stream the tested boxes */
 }
 
 static uintptr_t find_game_base(void) {
