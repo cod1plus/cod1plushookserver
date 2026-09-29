@@ -35,6 +35,12 @@ static NET_OutOfBandPrint_t p_NET_OutOfBandPrint = (NET_OutOfBandPrint_t)0x08084
 #define VA_PROTO_CVAR    0x080913FF  /* "protocol" serverinfo cvar default (REQUIRED: advertise) */
 #define VA_PROTO_REJMSG  0x08089F2C  /* reject "(should be %i)" value (cosmetic) */
 #define VA_PROTO_STATUS  0x08092B30  /* SV_StatusString "protocol" value (cosmetic) */
+#define VA_PROTO_TESTCLIENT 0x0808D0FB /* SV_AddTestClient (0x808d083): the fake connect it
+                                        * builds for a script addTestClient() says
+                                        * `protocol\6` (movl $0x6 @0x808d0f7, imm at +4).
+                                        * Unpatched, the patched SV_DirectConnect refuses
+                                        * every test client in silence and the script
+                                        * gets undefined. */
 
 #define VA_MASTER_STRING 0x080DFCEF  /* "codmaster.activision.com\0" */
 #define MASTER_FIELD_LEN 25          /* 24 chars + NUL, in-place overwrite budget */
@@ -287,6 +293,7 @@ void cod1reloaded_apply_patches(void) {
     req += (patch_proto_byte(VA_PROTO_CVAR)   == 0);
     patch_proto_byte(VA_PROTO_REJMSG);  /* cosmetic */
     patch_proto_byte(VA_PROTO_STATUS);  /* cosmetic */
+    patch_proto_byte(VA_PROTO_TESTCLIENT);  /* script addTestClient() */
     printf("%s protocol -> %d (%d/2 required sites patched)\n", TAG, g_protocol, req);
 
     /* Master: overwrite "codmaster.activision.com" in place (the resolver reads
@@ -351,6 +358,11 @@ int cod1reloaded_allow_connect(netadr_t from) {
     } else {
         buf[0] = 0;
     }
+
+    /* The engine's own test clients (script addTestClient(), SV_AddTestClient 0x808d083)
+     * connect from a NA_BOT address no network packet can carry, with a fixed userinfo
+     * and no cod1reloaded key: they are the server's, not a player's. */
+    if (from.type == NA_BOT) return 1;
 
     int ver = atoi(p_Info_ValueForKey(buf, "cod1reloaded"));
     if (ver < g_min_version && !(ver == 0 && g_allow_unversioned)) {
