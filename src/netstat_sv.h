@@ -11,4 +11,8 @@ void netstat_frame(void);
  * the client table cannot be read. Cheap: two loads. */
 int netstat_is_bot(int cn);
 
+/* zero the ghost velocity of every test client (they are drawn pos + velocity * dt by the
+ * client, 7-15 u ahead of where the server tests them). Once per frame. */
+void netstat_bots_freeze(uintptr_t game_base);
+
 #endif
