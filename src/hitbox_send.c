@@ -48,7 +48,7 @@
 #define GE_CLIENT    0x15c
 #define GE_MODEL     0x179
 #define GE_HEALTH    0x238
-#define PERIOD_MS    200
+#define PERIOD_MS    400
 #define MAX_CMD      900
 
 typedef void        (*sendcmd_t)(int cn, int a, const char* text);
@@ -56,10 +56,9 @@ typedef int         (*cvar_int_t)(const char* name);
 typedef const char* (*model_name_t)(int index);
 typedef int         (*world_tag_t)(void* ent, const char* tag, float* out);
 
-static const char* const BONES[] = {
+static const char* const BONES[] = {   /* 8 bones -> one command of ~500 bytes */
     "head", "neck", "back_up", "back_mid", "back_low",
-    "bip01 l clavicle", "bip01 r clavicle", "bip01 l upperarm", "bip01 r upperarm",
-    "bip01 l forearm", "bip01 r forearm", "bip01 l thigh", "bip01 r thigh"
+    "bip01 l clavicle", "bip01 r clavicle", "bip01 l upperarm"
 };
 #define NBONES (sizeof(BONES) / sizeof(BONES[0]))
 
@@ -88,6 +87,7 @@ static void tested_box(const hb_set_t* set, int bi, float mins[3], float maxs[3]
 static const hb_set_t* set_for_model(const char* name) {
     unsigned k;
     if (!name) return NULL;
+    if (!strncasecmp(name, "xmodel/", 7)) name += 7;   /* G_ModelName gives the full path */
     for (k = 0; k < HB_NUM_LOOKUP; ++k)
         if (!strcasecmp(HB_LOOKUP[k].xmodel, name)) return &HB_SETS[HB_LOOKUP[k].set];
     return &HB_UNIVERSAL;
@@ -103,7 +103,7 @@ static int pick_target(uintptr_t base, int viewer) {
     const float d[3]  = { cosf(pitch) * cosf(yaw), cosf(pitch) * sinf(yaw), -sinf(pitch) };
     const float eye[3] = { o[0], o[1], o[2] + ((ef & 0x40) ? 11.0f : (ef & 0x20) ? 40.0f : 60.0f) };
     int best = -1, i;
-    float best_ang = 0.5f;   /* ~30 degrees */
+    float best_ang = 1.2f;   /* ~60 degrees */
     for (i = 0; i < 64; ++i) {
         const char* te = (const char*)(base + RVA_G_ENTITIES) + (size_t)i * GENTITY_SIZE;
         const float* to;
@@ -114,7 +114,7 @@ static int pick_target(uintptr_t base, int viewer) {
         to = (const float*)(te + GE_ORIGIN);
         v[0] = to[0] - eye[0]; v[1] = to[1] - eye[1]; v[2] = to[2] + 40.0f - eye[2];
         along = v[0] * d[0] + v[1] * d[1] + v[2] * d[2];
-        if (along < 20.0f || along > 800.0f) continue;
+        if (along < 10.0f || along > 900.0f) continue;
         lat2 = v[0] * v[0] + v[1] * v[1] + v[2] * v[2] - along * along;
         ang = sqrtf(lat2 > 0 ? lat2 : 0) / along;
         if (ang < best_ang) { best_ang = ang; best = i; }
@@ -166,6 +166,16 @@ static void send_target(uintptr_t base, int viewer, int target) {
         memcpy(parts[b] + head_len, body[b], (size_t)blen[b] + 1);
         send(viewer, 0, parts[b]);
     }
+    {   /* rate-limited trace: proves the stream leaves the server */
+        static int last = 0;
+        const int now = *(const int*)(base + RVA_LEVEL_TIME);
+        if (now - last > 2000 || now < last) {
+            last = now;
+            printf("%s to cn=%d: target cn=%d (%s) %d bones in %d cmds, first %d bytes: %.60s\n",
+                   TAG, viewer, target, model ? model : "?", n, np, blen[0] + head_len, parts[0]);
+            fflush(stdout);
+        }
+    }
 }
 
 void hitbox_send_frame(uintptr_t base) {
@@ -178,7 +188,7 @@ void hitbox_send_frame(uintptr_t base) {
         g_on = ((cvar_int_t)(base + RVA_TRAP_CVAR_INT))("cod1x_drawhitbox") != 0;
         if (g_on != was) {
             printf("%s cod1x_drawhitbox %d - %s\n", TAG, g_on,
-                   g_on ? "streaming the tested boxes to each player (5 Hz, nearest target)" : "off");
+                   g_on ? "streaming the tested boxes to each player (2.5 Hz, nearest target)" : "off");
             fflush(stdout);
         }
         if (g_on && !g_idx_ready) {
@@ -197,5 +207,14 @@ void hitbox_send_frame(uintptr_t base) {
         g_last_send[i] = now;
         target = pick_target(base, i);
         if (target >= 0) send_target(base, i, target);
+        else {
+            static int last_none = 0;
+            if (now - last_none > 5000 || now < last_none) {
+                last_none = now;
+                printf("%s cn=%d: no target in view (ang %.0f/%.0f)\n", TAG, i,
+                       *(const float*)(ge + GE_APOS), *(const float*)(ge + GE_APOS + 4));
+                fflush(stdout);
+            }
+        }
     }
 }

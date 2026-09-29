@@ -133,3 +133,25 @@ void netstat_frame(void) {
         fflush(stdout);
     }
 }
+
+/* Test clients never move, yet their entity state carries a velocity (150 u/s along the
+ * view, from the fake usercmd pmove) and the client draws every player at
+ * pos + velocity * dt (TR_LINEAR_STOP extrapolation): a bot with that ghost velocity is
+ * DRAWN 7.5-15 u ahead of where the server tests it - "je vise, ca traverse". Zero it every
+ * frame: ps.velocity (gclient + 0x20) and es.pos.trDelta (ent + 0x24), so the drawn bot
+ * is the tested bot. Real players are not touched. */
+#define RVA_G_ENTITIES_NS 0x21d6c0
+#define GENTITY_SIZE_NS   0x31c
+void netstat_bots_freeze(uintptr_t game_base) {
+    int i;
+    if (!game_base) return;
+    for (i = 0; i < MAX_CL; ++i) {
+        char* ge = (char*)(game_base + RVA_G_ENTITIES_NS) + (size_t)i * GENTITY_SIZE_NS;
+        char* cl;
+        if (*(const int*)(ge + 0x04) != 1 || *(const int*)(ge + 0x90) != i) continue;
+        cl = *(char**)(ge + 0x15c);
+        if (!cl || !netstat_is_bot(i)) continue;
+        memset(cl + 0x20, 0, 12);      /* ps.velocity */
+        memset(ge + 0x24, 0, 12);      /* es.pos.trDelta */
+    }
+}

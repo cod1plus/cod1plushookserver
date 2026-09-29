@@ -295,6 +295,7 @@ static void hook_G_RunFrame(int levelTime) {
     pose_sync_frame(g_base);          /* the controller blend's per-frame pass: after the
                                        * frame, when every ClientEndFrame has run */
     hitbox_send_frame(g_base);        /* server cvar cod1x_drawhitbox: stream the tested boxes */
+    netstat_bots_freeze(g_base);      /* bots: no ghost velocity -> drawn where tested */
 }
 
 static uintptr_t find_game_base(void) {
