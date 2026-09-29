@@ -58,6 +58,12 @@ static int cvar_int(uintptr_t va) {
     return cv ? *(const int*)(cv + 0x20) : 0;
 }
 
+int netstat_is_bot(int cn) {
+    const char* clients = *(const char**)VA_SVS_CLIENTS;
+    if (!clients || cn < 0 || cn >= MAX_CL) return 0;
+    return *(const int*)(clients + (size_t)cn * CLIENT_SIZE + C_ADDR_TYPE) == 0;  /* NA_BOT */
+}
+
 void netstat_frame(void) {
     const char* clients;
     int i, n, now, maxrate;

@@ -7,4 +7,8 @@
  * Read-only on the engine; prints every N seconds. */
 void netstat_frame(void);
 
+/* 1 if slot cn is a test client (netchan address type NA_BOT), 0 otherwise or when
+ * the client table cannot be read. Cheap: two loads. */
+int netstat_is_bot(int cn);
+
 #endif

@@ -58,6 +58,7 @@
 
 #include "hooks.h"
 #include "swing_sync.h"
+#include "netstat_sv.h"
 #include "shared/lean_controllers.h"
 
 #define TAG "[pose_sync]"
@@ -276,7 +277,21 @@ static void pose_player(void* obj, void* es, int* partBits, void* ci, float* out
      * legs/torso/lean already ARE what the client draws, including the movement
      * offset on the legs that "legs = view" would wrongly erase for a moving player.
      * Only force when that mirror is not in place. */
-    if (g_enable && g_yaw && ci && !swing_sync_installed()) {
+    /* A test client (PAM bot) never sends usercmds, so the server's BG_PlayerAngles is not
+     * run for it after spawn: its legs yaw stays at a fraction of the view yaw (dump:
+     * legsY 39.4 for a view of 90, 78.8 for 180, torsoY = view) and the engine twists the
+     * spine 50-100 degrees to bring the torso back to the view - a body the client never
+     * draws (its own swing converges to the view). Bullets aimed at the drawn neck then
+     * pass beside the tested one. Force legs = torso = view for bots: the standing pose
+     * the client shows. Real players are not touched. */
+    if (g_enable && ci && es && netstat_is_bot(*(const int*)((const char*)es + ES_CLIENTNUM))) {
+        const float vy = *(const float*)(c + CI_VIEWYAW);
+        sv_torso = *(float*)(c + CI_TORSO_YAW);
+        sv_legs  = *(float*)(c + CI_LEGS_YAW);
+        *(float*)(c + CI_TORSO_YAW) = vy;
+        *(float*)(c + CI_LEGS_YAW)  = vy;
+        forced = 1;
+    } else if (g_enable && g_yaw && ci && !swing_sync_installed()) {
         if (*(const float*)(c + CI_LEAN) != 0.0f) {
             const float vy = *(const float*)(c + CI_VIEWYAW);
             sv_torso = *(float*)(c + CI_TORSO_YAW);
