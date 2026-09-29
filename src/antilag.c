@@ -255,6 +255,25 @@ static int shot_log_on(void) {
     return g_shot_log;
 }
 
+/* COD1RELOADED_HIT_DEBUG=1: tell the SHOOTER, in the bottom-left game-message area (the
+ * one GSC iprintln writes to: server command `f "text"`, Scr_MakeGameMessage 0x40208),
+ * which part each of his bullets hit, and which nearer limb it went through when the
+ * priority table (bullet_prio.c) resolved it that way. trap_SendServerCommand(clientNum,
+ * 0, text), game.mp.i386.so .dynsym 0x67c61 (ClientInactivityTimer 0x38dd6..0x38dfb). */
+#define RVA_TRAP_SEND_SERVER_CMD 0x067c61
+typedef void (*sendcmd_t)(int clientNum, int type, const char* text);
+static int g_hit_debug = -1;
+static const unsigned char NEAREST_PRIO[19] = { 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 0 };
+
+static int hit_debug_on(void) {
+    if (g_hit_debug < 0) {
+        const char* e = getenv("COD1RELOADED_HIT_DEBUG");
+        g_hit_debug = (e && e[0] == '1') ? 1 : 0;
+        if (g_hit_debug) { printf("%s HIT DEBUG ON - the shooter sees the part hit and the limb gone through\n", TAG); fflush(stdout); }
+    }
+    return g_hit_debug;
+}
+
 static const char* loc_name(int loc) {
     static const char* const n[19] = { "none", "helmet", "head", "neck", "torso_up", "torso_lo",
         "r_arm_up", "l_arm_up", "r_arm_lo", "l_arm_lo", "r_hand", "l_hand", "r_leg_up",
@@ -353,6 +372,22 @@ static void shot_audit(void* shooter, int cn, const float* start, const float* e
         n += snprintf(line + n, sizeof(line) - n, "nothing (ent %d frac %.2f)", hit_ent, *(float*)t);
     }
 
+    /* hit debug: the same bullet against the NEAREST-part table says which limb, if any,
+     * the priority table let it go through */
+    if (hit_debug_on() && hit_ent < 64) {
+        unsigned char tn[0x30];
+        int near_loc;
+        char msg[160];
+        memset(tn, 0, sizeof(tn));
+        tr(tn, start, end, *(int*)shooter, SHOT_MASK, NEAREST_PRIO);
+        near_loc = (*(unsigned short*)(tn + 0x28) == hit_ent) ? *(unsigned short*)(tn + 0x2c) : hit_loc;
+        if (near_loc != hit_loc)
+            snprintf(msg, sizeof(msg), "f \"^3hit ^2%s ^3through ^7%s\"", loc_name(hit_loc), loc_name(near_loc));
+        else
+            snprintf(msg, sizeof(msg), "f \"^7hit %s\"", loc_name(hit_loc));
+        ((sendcmd_t)(g_base + RVA_TRAP_SEND_SERVER_CMD))(cn, 0, msg);
+    }
+
     /* The latency question, asked to the engine itself: with every other player moved
      * back to where he was at the shooter's usercmd time (the antilag rewind, then the
      * same trace, then restore), would this bullet have hit? */
@@ -407,8 +442,10 @@ static void shot_audit(void* shooter, int cn, const float* start, const float* e
                       x_now, y_now, h_now, x_cmd, y_cmd, h_cmd, moved,
                       probes[0] ? " | 4u probes: " : "", probes);
     }
-    printf("%s\n", line);
-    fflush(stdout);
+    if (g_shot_log > 0) {
+        printf("%s\n", line);
+        fflush(stdout);
+    }
 }
 
 /* ---- the fire hook: wrap the bullet trace ------------------------------ */
@@ -434,7 +471,7 @@ static int hook_bullet_fire(void* shooter, int a2, int a3, int a4, int a5,
 static int hook_bullet_fire_inner(void* shooter, int a2, int a3, int a4, int a5,
                                   int depth, void* a7, int a8) {
     /* the audit sees every root shot, whether or not the rewind is on */
-    if (depth == 0 && !g_in_fire && shot_log_on()) {
+    if (depth == 0 && !g_in_fire && (shot_log_on() | hit_debug_on())) {
         const size_t d = (size_t)((char*)shooter - (char*)(g_base + RVA_g_entities));
         void* c = (d % GENTITY_SIZE == 0 && d / GENTITY_SIZE < AL_MAX_CLIENTS)
                 ? *(void**)((char*)shooter + E_CLIENT) : NULL;
