@@ -165,8 +165,8 @@ static void scan(uintptr_t base, int cn, const char* ge, const char* ci, int sta
                 int ent, loc;
                 for (i = 0; i < 3; ++i) {
                     const float p = o[i] + ax[i] * (float)x + (i == 2 ? (float)z : 0.0f);
-                    s[i] = p + d[i] * 60.0f;
-                    e[i] = p - d[i] * 60.0f;
+                    s[i] = p + d[i] * 45.0f;     /* 45: clears a wall next to him, still */
+                    e[i] = p - d[i] * 45.0f;     /* outside any stance (prone head ~30) */
                 }
                 memset(t, 0, sizeof(t));
                 tr(t, s, e, ENTITYNUM_NONE, BULLET_MASK, prio);
@@ -199,9 +199,14 @@ void hitmap_frame(uintptr_t base)
 {
     int i;
     if (g_on < 0) {
+        /* 1 = one map per stance/lean state; N >= 2 = rescan every N seconds (the first
+         * scan after a spawn catches the spawn animation, so a periodic one is needed
+         * to see the settled idle pose) */
         const char* e = getenv("COD1RELOADED_HITMAP");
-        g_on = (e && e[0] == '1') ? 1 : 0;
-        if (g_on) { printf("[hitmap] DIAGNOSTIC ON - never on a live server\n"); fflush(stdout); }
+        g_on = e ? atoi(e) : 0;
+        if (g_on < 0) g_on = 0;
+        if (g_on) { printf("[hitmap] DIAGNOSTIC ON (%s) - never on a live server\n",
+                           g_on >= 2 ? "periodic" : "per state"); fflush(stdout); }
     }
     if (!g_on || !base) return;
     for (i = 0; i < 64; ++i) {
@@ -216,8 +221,12 @@ void hitmap_frame(uintptr_t base)
         memcpy(&ef, ge + GE_EFLAGS, 4);
         /* state = stance * 10 + lean bucket (-3..+3 over leanf -0.5..0.5) + 3 */
         state = ((ef & 0x40) ? 2 : (ef & 0x20) ? 1 : 0) * 10 + (int)lrintf(leanf * 6.0f) + 3;
-        if (state == g_last_state[i] && g_last_time[i]) continue;          /* scanned */
-        if (now - g_last_time[i] < 1500 && now >= g_last_time[i]) continue;  /* cooldown */
+        if (g_on >= 2) {
+            if (g_last_time[i] && now - g_last_time[i] < g_on * 1000 && now >= g_last_time[i]) continue;
+        } else {
+            if (state == g_last_state[i] && g_last_time[i]) continue;          /* scanned */
+            if (now - g_last_time[i] < 1500 && now >= g_last_time[i]) continue;  /* cooldown */
+        }
         g_last_state[i] = state;
         g_last_time[i] = now;
         scan(base, i, ge, ci, state);

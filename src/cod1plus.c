@@ -31,6 +31,7 @@
 #include "perbone_hit.h"
 #include "pose_sync.h"
 #include "bullet_prio.h"
+#include "hitbox_fix.h"
 #include "swing_sync.h"
 #include "hitbox_draw.h"
 #include "antilag.h"
@@ -1667,6 +1668,7 @@ static void __attribute__((constructor)) init(void) {
     swing_sync_init();
     pose_sync_init();
     bullet_prio_init();   /* limbs never shield the body, every weapon (COD1RELOADED_BULLET_PRIO) */
+    hitbox_fix_init();    /* per-bone boxes grown to the visible mesh (COD1RELOADED_HITBOX_FIX) */
     hitbox_draw_init();   /* dev visualiser; no-op unless COD1RELOADED_HITBOX_DRAW=1 */
 
     /* cod1reloaded: server-side lag compensation. CoD1 has NO native antilag;
