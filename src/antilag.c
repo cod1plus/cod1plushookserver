@@ -361,8 +361,11 @@ static void shot_audit(void* shooter, int cn, const float* start, const float* e
     if (len < 1.0f) return;
     tmp = 1.0f / len; dir[0] *= tmp; dir[1] *= tmp; dir[2] *= tmp;
 
-    n = snprintf(line, sizeof(line), "%s shot#%ld cn=%d t=%d lag=%dms %s -> ", TAG, ++g_shot_n, cn,
-                 now, now - want, rifle ? "rifle" : "bullet");
+    /* hip or ADS: the shooter's EF_AIM (0x200). A hip-fired bolt rifle has a 4-degree cone
+     * (kar98k hipSpreadStandMin), 6 u off the aim point at 85 u - not a hitbox question. */
+    n = snprintf(line, sizeof(line), "%s shot#%ld cn=%d t=%d lag=%dms %s %s -> ", TAG, ++g_shot_n, cn,
+                 now, now - want, rifle ? "rifle" : "bullet",
+                 (*(const int*)((const char*)shooter + 0x8) & 0x200) ? "ads" : "hip");
     if (hit_ent < 64) {
         n += snprintf(line + n, sizeof(line) - n, "HIT cn=%d %s at %.0fu", hit_ent, loc_name(hit_loc),
                       *(float*)t * len);
