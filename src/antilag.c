@@ -29,6 +29,7 @@
 #include <pthread.h>
 
 #include "hooks.h"
+#include "hitmap_diag.h"
 
 #define TAG "[antilag]"
 
@@ -344,7 +345,7 @@ static void shot_audit(void* shooter, int cn, const float* start, const float* e
     unsigned char t[0x30];
     float dir[3], len, tmp;
     int i, hit_ent, hit_loc, n;
-    char line[900];
+    char line[1500];
     const char* winfo = a7 ? *(const char**)((const char*)a7 + 0x3c) : NULL;
     const int rifle = winfo && *(const int*)(winfo + 0x2c0) != 0;
     const unsigned char* prio = (const unsigned char*)(g_base + (rifle ? RVA_RIFLE_PRIO : RVA_BULLET_PRIO));
@@ -366,6 +367,16 @@ static void shot_audit(void* shooter, int cn, const float* start, const float* e
     n = snprintf(line, sizeof(line), "%s shot#%ld cn=%d t=%d lag=%dms %s %s -> ", TAG, ++g_shot_n, cn,
                  now, now - want, rifle ? "rifle" : "bullet",
                  (*(const int*)((const char*)shooter + 0x8) & 0x200) ? "ads" : "hip");
+    {
+        /* the shooter himself: where the server thinks his eye is versus his origin (view
+         * height + lean offset), his view angles and lean - to compare with what his own
+         * client shows him (a constant lateral / angular offset = camera, not hitbox) */
+        const float* so = (const float*)((const char*)shooter + E_ORIGIN);
+        n += snprintf(line + n, sizeof(line) - n, "[me org %.1f %.1f %.1f eye-org %+.1f %+.1f %+.1f ang %.1f/%.1f lean%+.2f] ",
+                      so[0], so[1], so[2], start[0] - so[0], start[1] - so[1], start[2] - so[2],
+                      *(const float*)((const char*)shooter + 0x3c), *(const float*)((const char*)shooter + 0x40),
+                      *(const float*)((const char*)shooter + E_LEANF));
+    }
     if (hit_ent < 64) {
         n += snprintf(line + n, sizeof(line) - n, "HIT cn=%d %s at %.0fu", hit_ent, loc_name(hit_loc),
                       *(float*)t * len);
@@ -444,6 +455,33 @@ static void shot_audit(void* shooter, int cn, const float* start, const float* e
                       (ef & 0x1) ? " dead" : "", *(const float*)(ge + E_LEANF), yaw, along_now,
                       x_now, y_now, h_now, x_cmd, y_cmd, h_cmd, moved,
                       probes[0] ? " | 4u probes: " : "", probes);
+        if (hit_ent != i) {
+            /* a near miss: everything needed to compare with the shooter's screen.
+             * netpos = es->pos.trBase (what the client draws at), org = currentOrigin (what
+             * the trace uses); head = head bone in his frame; eye/dir = the ray. */
+            static int last_scan_ms = 0;
+            const float* np = (const float*)(ge + 0x18);
+            float hm[16], hx = 0, hy = 0, hh = 0;
+            typedef int (*wtag_t)(const char*, const char*, float*);
+            wtag_t wtag = (wtag_t)(g_base + 0x06c973);
+            const float yr = yaw * 0.01745329252f;
+            if (wtag(ge, "head", hm)) {
+                const float dx = hm[12] - org[0], dy = hm[13] - org[1];
+                hx = dx * sinf(yr) - dy * cosf(yr); hy = dx * cosf(yr) + dy * sinf(yr); hh = hm[14] - org[2];
+            }
+            n += snprintf(line + n, sizeof(line) - n,
+                          " | netpos-org %+.1f %+.1f %+.1f | head x%+.1f y%+.1f h%.1f | la=%d ta=%d ef=0x%x | eye %.1f %.1f %.1f dir %.3f %.3f %.3f",
+                          np[0] - org[0], np[1] - org[1], np[2] - org[2], hx, hy, hh,
+                          *(const int*)(ge + 0xcc), *(const int*)(ge + 0xd0), ef,
+                          start[0], start[1], start[2], dir[0], dir[1], dir[2]);
+            if (now - last_scan_ms > 2000 || now < last_scan_ms) {
+                char tag[24];
+                last_scan_ms = now;
+                snprintf(tag, sizeof(tag), "%ld", g_shot_n);
+                hitmap_scan_shot(g_base, i, tag);
+                n += snprintf(line + n, sizeof(line) - n, " | hitmap_shot_%s_%d", tag, i);
+            }
+        }
     }
     if (g_shot_log > 0) {
         printf("%s\n", line);

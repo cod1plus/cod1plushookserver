@@ -45,6 +45,7 @@
 #include "gear_force.h"
 #include "competitive_sv.h"
 #include "cheat_gate.h"
+#include "hitbox_send.h"
 #include "hitmap_diag.h"
 #include "netstat_sv.h"
 
@@ -290,6 +291,7 @@ static void hook_G_RunFrame(int levelTime) {
     orig_runframe(levelTime);
     netstat_frame();                  /* COD1RELOADED_NETSTAT=N only: snapshot / rate report */
     hitmap_frame(g_base);             /* diagnostic, COD1RELOADED_HITMAP=1 only */
+    hitbox_send_frame(g_base);        /* server cvar cod1x_drawhitbox: stream the tested boxes */
 }
 
 static uintptr_t find_game_base(void) {
