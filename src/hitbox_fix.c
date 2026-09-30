@@ -60,6 +60,7 @@ static part_test_t g_orig     = NULL;
 static int         g_enabled  = 1;
 static int         g_verified = 0;
 static int         g_dbg      = 0;
+static int         g_head_on_mesh = 1;     /* COD1RELOADED_HEAD_ON_MESH=0: leave the head box on "head" */
 
 /* bone tables already looked at (a table is reloaded with every map, at any address, so
  * the first entry's bytes are kept and re-checked: a new table at an old address is seen) */
@@ -163,6 +164,31 @@ static void patch_parts(void* parts, const char* model) {
             const hb_fix_t* f = &set->fix[k];
             if (f->bone < (unsigned)nbones) set_entry(&e[f->bone], f->mins, f->maxs);
         }
+        /* THE HEAD BOX GOES ON THE BONE THE HEAD MESH RIDES. The shipped table puts the head
+         * box on the controller bone "head" (a leaf under "bip01 head", same place, identity
+         * bind offset), but every head model is skinned to "bip01 head" (348 of basehead's
+         * 487 vertices, the rest on jaw / lips under it): the head controller's rotation
+         * (aim pitch, lean roll, aim-walk) turns the BOX and not the visible head. Measured
+         * live on a walking, aiming player: 13.6 degrees between the two bones = the top of
+         * the box 2.5 u off the skull. "bip01 head" already carries the head hit location
+         * (class 2) and has no box: it gets the head box, "head" gets none. */
+        if (g_head_on_mesh) {
+            int b_head = -1, b_bip = -1;
+            for (k = 0; k < HB_NBONES; ++k) {
+                if (!strcmp(HB_BONE_NAMES[k], "head")) b_head = (int)k;
+                if (!strcmp(HB_BONE_NAMES[k], "bip01 head")) b_bip = (int)k;
+            }
+            if (b_head >= 0 && b_bip >= 0 && b_head < nbones && b_bip < nbones && e[b_bip].r2 == 0.0f) {
+                const unsigned char* cls = *(const unsigned char* const*)(p + 0x14);
+                if (cls && cls[b_bip] == cls[b_head]) {
+                    e[b_bip] = e[b_head];
+                    memset(&e[b_head], 0, sizeof(hb_entry_t));
+                } else {
+                    printf("%s head box NOT moved: hit location of bip01 head (%d) differs from head (%d)\n", TAG,
+                           cls ? cls[b_bip] : -1, cls ? cls[b_head] : -1);
+                }
+            }
+        }
         printf("%s %s: %u boxes grown to the mesh (set %s, table %p)\n", TAG,
                name ? name : "(no name)", set->nfix, set->parts, parts);
         fflush(stdout);
@@ -208,7 +234,9 @@ static int hook_part_test(void* obj, const float* start, const float* end,
 }
 
 void hitbox_fix_init(void) {
+    const char* hm = getenv("COD1RELOADED_HEAD_ON_MESH");
     const char* e = getenv("COD1RELOADED_HITBOX_FIX");
+    if (hm && *hm) g_head_on_mesh = atoi(hm) != 0;
     if (e && (e[0] == '0' || !strcmp(e, "off"))) {
         printf("%s off - shipped boxes (collar / overcoat / hands not hittable)\n", TAG);
         return;

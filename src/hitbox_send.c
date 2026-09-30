@@ -151,7 +151,8 @@ static void send_target(uintptr_t base, int viewer, int target, int group) {
         char tok[200];
         int  tl;
         if (g_bone_idx[b] < 0) continue;
-        if (!wtag(te, BONES[b], m)) continue;
+        /* the head box is tested on "bip01 head", the bone the head mesh rides (hitbox_fix.c) */
+        if (!wtag(te, strcmp(BONES[b], "head") ? BONES[b] : "bip01 head", m)) continue;
         tested_box(set, g_bone_idx[b], mins, maxs);
         tl = snprintf(tok, sizeof(tok),
                       " %d,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f",
