@@ -256,7 +256,7 @@ static int shot_log_on(void) {
     return g_shot_log;
 }
 
-/* COD1RELOADED_HIT_DEBUG=1: tell the SHOOTER, in the bottom-left game-message area (the
+/* Hit debug (devmap only, see hit_debug_on): tell the SHOOTER, in the bottom-left game-message area (the
  * one GSC iprintln writes to: server command `f "text"`, Scr_MakeGameMessage 0x40208),
  * which part each of his bullets hit, and which nearer limb it went through when the
  * priority table (bullet_prio.c) resolved it that way. trap_SendServerCommand(clientNum,
@@ -267,11 +267,26 @@ static int g_hit_debug = -1;
 static const unsigned char NEAREST_PRIO[19] = { 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 0 };
 
 static int hit_debug_on(void) {
-    if (g_hit_debug < 0) {
-        const char* e = getenv("COD1RELOADED_HIT_DEBUG");
-        g_hit_debug = (e && e[0] == '1') ? 1 : 0;
-        if (g_hit_debug) { printf("%s HIT DEBUG ON - the shooter sees the part hit and the limb gone through\n", TAG); fflush(stdout); }
+    /* DEVMAP ONLY: the message tells the shooter what he hit, so it needs cheats on the
+     * server (sv_cheats 1) AND the switch - the game cvar g_debugLocDamage (rcon set
+     * g_debugLocDamage 1), or COD1RELOADED_HIT_DEBUG=1 in the environment. Polled once a
+     * second; a match server (sv_cheats 0) never sends it whatever the cvar says. */
+    static int last = -100000, env = -1;
+    int now, on;
+    if (!g_base) return 0;
+    now = level_time();
+    if (g_hit_debug >= 0 && now - last <= 1000 && now >= last) return g_hit_debug;
+    last = now;
+    if (env < 0) { const char* e = getenv("COD1RELOADED_HIT_DEBUG"); env = (e && e[0] == '1') ? 1 : 0; }
+    {
+        trap_cvar_int_t geti = (trap_cvar_int_t)(g_base + RVA_TRAP_CVAR_INT);
+        on = (env || geti("g_debugLocDamage") != 0) && geti("sv_cheats") != 0;
     }
+    if (on != g_hit_debug) {
+        printf("%s hit debug %s (needs sv_cheats 1 and g_debugLocDamage 1)\n", TAG, on ? "ON - the shooter sees the part hit" : "off");
+        fflush(stdout);
+    }
+    g_hit_debug = on;
     return g_hit_debug;
 }
 

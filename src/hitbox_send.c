@@ -20,8 +20,9 @@
  * (positions relative to the player origin, 1 decimal; axes = the bone's local axes in
  * world; box = mins/maxs in that frame). A command stays under 900 bytes.
  *
- * Gate: the SERVER cvar cod1x_drawhitbox (rcon set cod1x_drawhitbox 1), polled once a
- * second through the game's trap_Cvar_VariableIntegerValue. Costs nothing when 0.
+ * Gate: the SERVER cvar cod1x_drawhitbox (rcon set cod1x_drawhitbox 1) AND sv_cheats 1
+ * (devmap), polled once a second through the game's trap_Cvar_VariableIntegerValue. Costs
+ * nothing when off; a match server never streams.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -193,7 +194,9 @@ void hitbox_send_frame(uintptr_t base) {
     if (now - g_last_poll > 1000 || now < g_last_poll) {
         const int was = g_on;
         g_last_poll = now;
-        g_on = ((cvar_int_t)(base + RVA_TRAP_CVAR_INT))("cod1x_drawhitbox") != 0;
+        /* DEVMAP ONLY: never streamed from a server without cheats */
+        g_on = ((cvar_int_t)(base + RVA_TRAP_CVAR_INT))("cod1x_drawhitbox") != 0 &&
+               ((cvar_int_t)(base + RVA_TRAP_CVAR_INT))("sv_cheats") != 0;
         if (g_on != was) {
             printf("%s cod1x_drawhitbox %d - %s\n", TAG, g_on,
                    g_on ? "streaming the tested boxes to each player (2.5 Hz, nearest target)" : "off");
