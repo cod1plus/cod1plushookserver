@@ -39,6 +39,7 @@ ${CC} -m32 -shared -fPIC -O2 -Wall -Wextra ${CFLAGS_COMPAT} \
   "${ROOT_DIR}/src/competitive_sv.c" \
   "${ROOT_DIR}/src/gear_force.c" \
   "${ROOT_DIR}/src/cheat_gate.c" \
+  "${ROOT_DIR}/src/pure_extra.c" \
   "${ROOT_DIR}/src/hooks.c" \
   -o "${BUILD_DIR}/cod1plus.so" \
   -pthread -lm -ldl
