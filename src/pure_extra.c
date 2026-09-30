@@ -131,7 +131,7 @@ static char *hook_loaded_pak_pure_checksums(void) {
         }
     }
     if (held)
-        printf("%s a client answered with %d of the %d pak(s) (it has the HD pack): accepted\n", TAG, held, n);
+        printf("%s a client answered with %d of the %d pak(s) (it has the HD pack): known to the verify list\n", TAG, held, n);
     if (feed != g_announced_feed) {            /* once per map: the feed changes at every spawn */
         g_announced_feed = feed;
         printf("%s %d client-side pak(s) accepted without the files (%s..%s), checksum feed %d\n",
