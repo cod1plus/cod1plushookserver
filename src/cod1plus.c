@@ -40,6 +40,16 @@
 #include "cheat_gate.h"
 
 #define COD1PLUS_TAG    "[cod1plus]"
+
+/* test/test_multimap.c includes this file to drive the match logic on the host: there the
+ * module must not install itself. */
+#ifdef COD1PLUS_TEST
+#define COD1PLUS_CTOR
+#define COD1PLUS_DTOR
+#else
+#define COD1PLUS_CTOR __attribute__((constructor))
+#define COD1PLUS_DTOR __attribute__((destructor))
+#endif
 #define CFG_PATH        "./matchdata.cfg"
 #define MAX_PLAYERS     32
 
@@ -116,6 +126,20 @@ static match_config_t g_cfg;
 static int            g_team1_won_maps = 0;
 static int            g_team2_won_maps = 0;
 static int            g_finished_maps  = 0;
+
+/* ---- multi-map matches (BO3 / BO5 ladder) ----------------------------------------------
+ * What zPAM reports to the same platform (eyza-cod2/zpam3, _matchinfo.gsc: finishMap /
+ * endMap / uploadMatchData), reproduced here because on CoD1 it is this module that builds
+ * the payload. At the end of EVERY map: finishedMapsCount goes up, the winner's
+ * teamN_winnedMaps goes up, finishedMap<N> = the map name, and that payload carries state
+ * "finished" + debug "finishMap". The next map starts again from "playing" with the
+ * counters carried over; the platform closes the match from format + winnedMaps.
+ * A BO1 is left exactly as it was (the counters never move): that path is live in soloq. */
+#define MAX_MATCH_MAPS 5
+static char           g_finished_map_name[MAX_MATCH_MAPS][64];
+static char           g_current_map[64];   /* the map being played (the log's InitGame lines) */
+static int            g_map_counted = 0;   /* the map being played already went into the counters */
+static int            g_match_over  = 0;   /* a team holds the maps its format needs */
 typedef void (*SV_DirectConnect_t)(netadr_t from);
 static hook_t             g_sv_directconnect_hook;
 static SV_DirectConnect_t g_sv_directconnect_trampoline = NULL;
@@ -1184,6 +1208,196 @@ static void side_tracker_update(const match_config_t *c, const round_event_t *ev
     g_last_event_axis   = ev->axis_score;
 }
 
+/* BO1 -> 1 map to win, BO3 -> 2, BO5 -> 3 (anything else: 1) */
+static int format_maps_to_win(const match_config_t *c) {
+    int n = 0;
+    if (c && (c->format[0] == 'B' || c->format[0] == 'b') &&
+             (c->format[1] == 'O' || c->format[1] == 'o'))
+        n = atoi(c->format + 2);
+    if (n < 1 || n > 9) n = 1;
+    return n / 2 + 1;
+}
+
+static int is_multi_map(const match_config_t *c) { return format_maps_to_win(c) > 1; }
+
+/* The map being played: the last InitGame line of the log, else the match setup's first
+ * map, else the +map of the command line. */
+static const char *current_map_name(const match_config_t *c) {
+    static char cmd_map[64];
+    if (g_current_map[0]) return g_current_map;
+    if (c && c->map[0]) return c->map;
+    if (!cmd_map[0]) {
+        FILE *f = fopen("/proc/self/cmdline", "r");
+        if (f) {
+            char cmdline[2048] = {0};
+            size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, f);
+            fclose(f);
+            for (size_t i = 0; i + 6 < n; i++) {
+                if (cmdline[i] == 0 && strncmp(&cmdline[i + 1], "+map", 4) == 0 && cmdline[i + 5] == 0) {
+                    strncpy(cmd_map, &cmdline[i + 6], sizeof(cmd_map) - 1);
+                    break;
+                }
+            }
+        }
+        if (!cmd_map[0]) strncpy(cmd_map, "unknown", sizeof(cmd_map) - 1);
+    }
+    return cmd_map;
+}
+
+/* "InitGame: \...\mapname\mp_carentan\..." - logged at every map load and every restart */
+static void note_initgame(const char *line) {
+    const char *p = strstr(line, "\\mapname\\");
+    size_t n;
+    if (!p) return;
+    p += 9;
+    n = strcspn(p, "\\\r\n");
+    if (n == 0 || n >= sizeof(g_current_map)) return;
+    if (strlen(g_current_map) == n && strncmp(g_current_map, p, n) == 0) return;
+    memcpy(g_current_map, p, n);
+    g_current_map[n] = 0;
+    printf("%s Map is now %s\n", COD1PLUS_TAG, g_current_map);
+}
+
+/* 1 / 2 = the roster team of an event player (login uuid first, then config name), 0 = unknown */
+static int roster_team_of(const match_config_t *c, const event_player_t *ep) {
+    const char *uuid = uuid_for_event_player(c, ep);
+    if (uuid && uuid[0] && strcmp(uuid, ep->name) != 0)
+        for (int i = 0; i < c->num_players; i++)
+            if (c->players[i].uuid[0] && strcmp(c->players[i].uuid, uuid) == 0)
+                return c->players[i].team == 1 ? 1 : 2;
+    int idx = find_config_player(c, ep->name);
+    if (idx >= 0) return c->players[idx].team == 1 ? 1 : 2;
+    return 0;
+}
+
+/* Which side team1 plays RIGHT NOW, read off the players of the event instead of being
+ * carried from the match setup: on map 2 and 3 of a ladder match the teams choose their
+ * sides again, and the halftime state left by the previous map says nothing about it.
+ * Every roster player votes (a team1 player on allies and a team2 player on axis say the
+ * same thing); no identified player or a split vote leaves the tracker's value. */
+static void infer_team1_side(const match_config_t *c, const round_event_t *ev) {
+    int allies = 0, axis = 0;
+    for (int i = 0; i < ev->num_players; i++) {
+        const event_player_t *ep = &ev->players[i];
+        const int is_allies = strcmp(ep->team, "allies") == 0;
+        const int is_axis   = strcmp(ep->team, "axis") == 0;
+        const int t = roster_team_of(c, ep);
+        if (!t || (!is_allies && !is_axis)) continue;
+        if ((t == 1) == is_allies) allies++; else axis++;
+    }
+    if (allies == axis) return;
+    if ((allies > axis) != g_team1_is_allies_current) {
+        g_team1_is_allies_current = allies > axis;
+        printf("%s team1 plays %s (read from %d roster players)\n", COD1PLUS_TAG,
+               g_team1_is_allies_current ? "allies" : "axis", allies + axis);
+    }
+}
+
+/* Is the MAP over with this event?
+ * A map is over when someone REACHES THE SCORE LIMIT - never merely because the round
+ * counter hit round_limit. In MR12 a 12-12 after 24 rounds goes to overtime, and reporting
+ * finished there closed the match on the platform with a draw score (match 316953,
+ * 2026-08-07: "round":"Round 24 | MR12", 12-12, state finished).
+ *
+ * The overtime handling in side_tracker_update() cannot save us here: it only raises
+ * g_current_score_limit once PAM has restarted the round counter at 1, which happens on
+ * the FIRST event of overtime - one event AFTER this one. So the round_limit test fires
+ * first, every time.
+ *
+ * round_limit is kept only as a safety net for a map that somehow overruns, and it must
+ * never fire on a tie: with equal scores there is no winner to report.
+ * force_finished = PAM said so (MatchEnd; / MapEnd;). */
+static int event_is_finished(const match_config_t *c, const round_event_t *ev, int force_finished) {
+    int t1, t2;
+    int team1_is_allies = g_side_tracker_initialized
+                        ? g_team1_is_allies_current
+                        : ((c->team1_side == 2) ? 0 : 1);
+    int limit = g_side_tracker_initialized ? g_current_score_limit : c->score_limit;
+    if (limit <= 0) limit = 13;
+    resolve_scores(c, ev->allies_score, ev->axis_score, team1_is_allies, &t1, &t2);
+    if (force_finished) return 1;
+    if (t1 >= limit || t2 >= limit) return 1;
+    if (ev->round >= c->round_limit && t1 != t2) return 1;
+    return 0;
+}
+
+/* The counters of a multi-map match survive a server restart between two maps: they are
+ * written next to the game log each time a map ends, and read back at start-up when the
+ * file belongs to the same match. */
+static void match_state_path(char *out, size_t sz) {
+    const char *log = g_cfg.logfile[0] ? g_cfg.logfile : "./qconsole.log";
+    const char *slash = strrchr(log, '/');
+    if (slash) snprintf(out, sz, "%.*s/cod1plus_match.state", (int)(slash - log), log);
+    else       snprintf(out, sz, "./cod1plus_match.state");
+}
+
+static void match_state_save(void) {
+    char path[512];
+    FILE *f;
+    match_state_path(path, sizeof(path));
+    f = fopen(path, "w");
+    if (!f) { printf("%s Cannot write %s\n", COD1PLUS_TAG, path); return; }
+    fprintf(f, "match %s\nmaps %d %d %d\n", g_cfg.match_id, g_finished_maps, g_team1_won_maps, g_team2_won_maps);
+    for (int i = 0; i < g_finished_maps && i < MAX_MATCH_MAPS; i++)
+        fprintf(f, "map %s\n", g_finished_map_name[i]);
+    fclose(f);
+}
+
+static void match_state_load(void) {
+    char path[512], line[256], id[64] = {0};
+    int fin = 0, w1 = 0, w2 = 0, nmaps = 0;
+    char names[MAX_MATCH_MAPS][64];
+    FILE *f;
+    if (!is_multi_map(&g_cfg) || !g_cfg.match_id[0]) return;
+    match_state_path(path, sizeof(path));
+    f = fopen(path, "r");
+    if (!f) return;
+    memset(names, 0, sizeof(names));
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\r\n")] = 0;
+        if (strncmp(line, "match ", 6) == 0) strncpy(id, line + 6, sizeof(id) - 1);
+        else if (strncmp(line, "maps ", 5) == 0) sscanf(line + 5, "%d %d %d", &fin, &w1, &w2);
+        else if (strncmp(line, "map ", 4) == 0 && nmaps < MAX_MATCH_MAPS) strncpy(names[nmaps++], line + 4, 63);
+    }
+    fclose(f);
+    if (strcmp(id, g_cfg.match_id) != 0 || fin <= 0 || fin > 9) return;
+    g_finished_maps = fin; g_team1_won_maps = w1; g_team2_won_maps = w2;
+    memcpy(g_finished_map_name, names, sizeof(names));
+    g_match_over = w1 >= format_maps_to_win(&g_cfg) || w2 >= format_maps_to_win(&g_cfg);
+    printf("%s Match %s resumed: %d map(s) played, %d-%d%s\n", COD1PLUS_TAG, id, fin, w1, w2,
+           g_match_over ? " - already decided" : "");
+}
+
+/* The map being played has ended with this event: once per map, it goes into the counters. */
+static void map_finished_once(const match_config_t *c, const round_event_t *ev) {
+    int t1, t2;
+    if (!is_multi_map(c) || g_map_counted || !ev) return;
+    resolve_scores(c, ev->allies_score, ev->axis_score, g_team1_is_allies_current, &t1, &t2);
+    if (g_finished_maps < MAX_MATCH_MAPS)
+        snprintf(g_finished_map_name[g_finished_maps], sizeof(g_finished_map_name[0]), "%s",
+                 current_map_name(c));
+    g_finished_maps++;
+    if (t1 > t2) g_team1_won_maps++; else if (t2 > t1) g_team2_won_maps++;
+    g_map_counted = 1;
+    g_match_over = g_team1_won_maps >= format_maps_to_win(c) || g_team2_won_maps >= format_maps_to_win(c);
+    printf("%s Map %d (%s) over %d-%d: maps %d-%d (%s)%s\n", COD1PLUS_TAG, g_finished_maps,
+           current_map_name(c), t1, t2, g_team1_won_maps, g_team2_won_maps, c->format,
+           g_match_over ? " - MATCH OVER" : "");
+    match_state_save();
+}
+
+/* First round event after a counted map: the next map of the match has started. */
+static void new_map_begins(const match_config_t *c) {
+    g_map_counted = 0;
+    g_current_score_limit = (c && c->score_limit > 0) ? c->score_limit : 13;
+    g_last_event_round = -1;
+    g_last_event_ht = -1;
+    g_last_event_allies = -1;
+    g_last_event_axis = -1;
+    g_have_last_ev = 0;
+    printf("%s Map %d of the match begins (%s)\n", COD1PLUS_TAG, g_finished_maps + 1, current_map_name(c));
+}
+
 static int build_payload(const match_config_t *c,
                          const round_event_t *ev,
                          char *out, size_t out_sz,
@@ -1197,60 +1411,33 @@ static int build_payload(const match_config_t *c,
     resolve_scores(c, ev->allies_score, ev->axis_score, team1_is_allies,
                    &t1_score, &t2_score);
 
-    /* Determine match state */
-    const char *state = "playing";
-    int effective_score_limit = g_side_tracker_initialized
-                              ? g_current_score_limit
-                              : c->score_limit;
-    if (effective_score_limit <= 0) effective_score_limit = 13;
-
-    /* A match is over when someone REACHES THE SCORE LIMIT - never merely because the
-     * round counter hit round_limit. In MR12 a 12-12 after 24 rounds goes to overtime,
-     * and reporting finished there closed the match on the platform with a draw score
-     * (match 316953, 2026-08-07: "round":"Round 24 | MR12", 12-12, state finished).
-     *
-     * The overtime handling in side_tracker_update() cannot save us here: it only raises
-     * g_current_score_limit once PAM has restarted the round counter at 1, which happens
-     * on the FIRST event of overtime - one event AFTER this one. So the round_limit test
-     * fires first, every time.
-     *
-     * round_limit is kept only as a safety net for a match that somehow overruns, and it
-     * must never fire on a tie: with equal scores there is no winner to report. */
-    if (force_finished)
-        state = "finished";                 /* PAM said so - MatchEnd; / MapEnd; */
-    else if (t1_score >= effective_score_limit || t2_score >= effective_score_limit)
-        state = "finished";
-    else if (ev->round >= c->round_limit && t1_score != t2_score)
-        state = "finished";
+    /* Map state (see event_is_finished) and what triggered the upload, as zPAM names it */
+    const int   finished = event_is_finished(c, ev, force_finished);
+    const char *state    = finished ? "finished" : "playing";
+    const char *debug    = (finished && is_multi_map(c)) ? "finishMap" : "sd endround";
 
     /* Round display string, e.g. "Round 3 | MR12" */
     char round_str[64];
     snprintf(round_str, sizeof(round_str), "Round %d | %s", ev->round, c->mr);
 
     /* Escaped strings */
-    char t1n[256], t2n[256], mapn[64], demo[512];
+    char t1n[256], t2n[256], mapn[64] = {0}, demo[512];
     json_esc(c->team1_name,  t1n,  sizeof(t1n));
     json_esc(c->team2_name,  t2n,  sizeof(t2n));
     json_esc(c->demo_url,    demo, sizeof(demo));
 
-    /* Read map name from /proc/self/cmdline (+map argument) */
-    mapn[0] = 0;
-    if (c->map[0]) {
-        strncpy(mapn, c->map, sizeof(mapn) - 1);
-    } else {
-        FILE *f = fopen("/proc/self/cmdline", "r");
-        if (f) {
-            char cmdline[2048] = {0};
-            fread(cmdline, 1, sizeof(cmdline)-1, f);
-            fclose(f);
-            for (int i = 0; i < 2000; i++) {
-                if (cmdline[i] == 0 && strncmp(&cmdline[i+1], "+map", 4) == 0) {
-                    strncpy(mapn, &cmdline[i+6], sizeof(mapn)-1);
-                    break;
-                }
-            }
+    /* The map being played, and the maps already played (finishedMap1..N) */
+    strncpy(mapn, current_map_name(c), sizeof(mapn) - 1);
+    mapn[sizeof(mapn) - 1] = 0;
+    char finished_maps[512] = {0};
+    {
+        int fpos = 0;
+        for (int i = 0; i < g_finished_maps && i < MAX_MATCH_MAPS; i++) {
+            char esc[96];
+            json_esc(g_finished_map_name[i], esc, sizeof(esc));
+            fpos += snprintf(finished_maps + fpos, sizeof(finished_maps) - fpos,
+                             "\"finishedMap%d\":\"%s\",", i + 1, esc);
         }
-        if (mapn[0] == 0) strncpy(mapn, "unknown", sizeof(mapn)-1);
     }
 
     /* Begin JSON */
@@ -1275,12 +1462,13 @@ static int build_payload(const match_config_t *c,
         "\"team1_winnedMaps\":\"%d\","
         "\"team2_winnedMaps\":\"%d\","
         "\"finishedMapsCount\":\"%d\","
+        "%s"
         "\"team1_score\":\"%d\","
         "\"team2_score\":\"%d\","
         "\"map\":\"%s\","
         "\"round\":\"%s\","
         "\"state\":\"%s\","
-        "\"debug\":\"sd endround\","
+        "\"debug\":\"%s\","
         "\"players\":[",
         c->start_time,
         c->match_id,
@@ -1291,8 +1479,9 @@ static int build_payload(const match_config_t *c,
         players_count,
         c->team1_tag, c->team2_tag,
         g_team1_won_maps, g_team2_won_maps, g_finished_maps,
+        finished_maps,
         t1_score, t2_score,
-        mapn, round_str, state);
+        mapn, round_str, state, debug);
 
     /* Players array */
     int emitted_players = 0;
@@ -1535,6 +1724,66 @@ static int fetch_match_setup(const char *match_id) {
 /* games_mp.log tailer thread                                          */
 /* ------------------------------------------------------------------ */
 
+/* One line of the game log. Returns 1 when `payload` must be POSTed. */
+static int process_log_line(const char *line, char *payload, size_t payload_sz) {
+    /* the map being played */
+    if (strstr(line, "InitGame:"))
+        note_initgame(line);
+
+    /* PAM announces overtime in the log before the first OT round is played. */
+    if (strstr(line, "OverTime;"))
+        overtime_signalled();
+
+    /* ...and announces the real end of the map: "MatchEnd;" in match mode, "MapEnd;" in
+     * public mode (_end_of_map.gsc::Do_Map_End). This is the only trustworthy "it is
+     * over" signal - the scores alone cannot tell a 12-12 that is about to go to overtime
+     * from a 12-12 that ends the map because scr_overtime is off. Without it, gating the
+     * round_limit clause on a winner would leave a genuine drawn map reported as
+     * "playing" forever.
+     *
+     * sd.gsc runs logStats() BEFORE the limit checks, so the last round's event has
+     * already been sent by the time this line appears: re-send it, with the state forced
+     * to finished (and, in a multi-map match, the map counted if it was not yet). */
+    if (strstr(line, "MatchEnd;") || strstr(line, "MapEnd;")) {
+        printf("%s %.20s - map over\n", COD1PLUS_TAG,
+               strstr(line, "MatchEnd;") ? "MatchEnd;" : "MapEnd;");
+        if (!g_have_last_ev) return 0;
+        map_finished_once(&g_cfg, &g_last_ev);
+        build_payload(&g_cfg, &g_last_ev, payload, payload_sz, 1);
+        printf("%s Re-sending final payload as finished\n", COD1PLUS_TAG);
+        return 1;
+    }
+
+    if (strstr(line, "[STATS_EVENT]")) {
+        round_event_t ev;
+        const int multi = is_multi_map(&g_cfg);
+        printf("%s Event received: %.120s...\n", COD1PLUS_TAG, line);
+        if (parse_event(line, &ev) != 0) return 0;
+
+        if (multi && g_match_over) {
+            printf("%s Match decided %d-%d (%s): event not reported\n", COD1PLUS_TAG,
+                   g_team1_won_maps, g_team2_won_maps, g_cfg.format);
+            return 0;
+        }
+        if (multi && g_map_counted) new_map_begins(&g_cfg);
+
+        side_tracker_update(&g_cfg, &ev);
+        if (multi) {
+            infer_team1_side(&g_cfg, &ev);
+            if (event_is_finished(&g_cfg, &ev, 0)) map_finished_once(&g_cfg, &ev);
+        }
+        printf("%s Round %d done — %d players, winner=%s, as=%d xs=%d\n",
+               COD1PLUS_TAG, ev.round, ev.num_players,
+               ev.round_winner, ev.allies_score, ev.axis_score);
+
+        g_last_ev = ev;
+        g_have_last_ev = 1;
+        build_payload(&g_cfg, &ev, payload, payload_sz, 0);
+        return 1;
+    }
+    return 0;
+}
+
 static void *log_tailer_thread(void *arg) {
     (void)arg;
     printf("%s Log tailer started, waiting for matchdata.cfg...\n", COD1PLUS_TAG);
@@ -1548,6 +1797,7 @@ static void *log_tailer_thread(void *arg) {
 
     const char *logpath = g_cfg.logfile[0] ? g_cfg.logfile : "./qconsole.log";
     printf("%s Tailing '%s' for [STATS_EVENT] lines...\n", COD1PLUS_TAG, logpath);
+    match_state_load();      /* BO3 / BO5: maps already played before a restart */
 
     FILE *f = NULL;
     long  last_pos = 0;
@@ -1578,57 +1828,15 @@ static void *log_tailer_thread(void *arg) {
         fseek(f, last_pos, SEEK_SET);
         char line[8192];
         while (fgets(line, sizeof(line), f)) {
-            /* PAM announces overtime in the log before the first OT round is played. */
-            if (strstr(line, "OverTime;"))
-                overtime_signalled();
-
-            /* ...and announces the real end of the map: "MatchEnd;" in match mode,
-             * "MapEnd;" in public mode (_end_of_map.gsc::Do_Map_End). This is the only
-             * trustworthy "it is over" signal - the scores alone cannot tell a 12-12 that
-             * is about to go to overtime from a 12-12 that ends the map because
-             * scr_overtime is off. Without it, gating the round_limit clause on a winner
-             * would leave a genuine drawn map reported as "playing" forever.
-             *
-             * sd.gsc runs logStats() BEFORE the limit checks, so the last round's event
-             * has already been sent by the time this line appears: re-send it, with the
-             * state forced to finished. */
-            if (strstr(line, "MatchEnd;") || strstr(line, "MapEnd;")) {
-                printf("%s %.20s - map over\n", COD1PLUS_TAG,
-                       strstr(line, "MatchEnd;") ? "MatchEnd;" : "MapEnd;");
-                if (g_have_last_ev) {
-                    char payload[65536];
-                    build_payload(&g_cfg, &g_last_ev, payload, sizeof(payload), 1);
-                    printf("%s Re-sending final payload as finished\n", COD1PLUS_TAG);
-                    if (http_post(g_cfg.api_url, payload) != 0)
-                        printf("%s Final payload send FAILED\n", COD1PLUS_TAG);
-                }
-            }
-
-            if (strstr(line, "[STATS_EVENT]")) {
-                printf("%s Event received: %.120s...\n", COD1PLUS_TAG, line);
-
-                round_event_t ev;
-                if (parse_event(line, &ev) == 0) {
-                    side_tracker_update(&g_cfg, &ev);
-                    printf("%s Round %d done — %d players, winner=%s, as=%d xs=%d\n",
-                           COD1PLUS_TAG, ev.round, ev.num_players,
-                           ev.round_winner, ev.allies_score, ev.axis_score);
-
-                    g_last_ev = ev;
-                    g_have_last_ev = 1;
-
-                    char payload[65536];
-                    build_payload(&g_cfg, &ev, payload, sizeof(payload), 0);
-                    printf("%s Sending payload (%zu bytes) to %s\n",
-                           COD1PLUS_TAG, strlen(payload), g_cfg.api_url);
-                    printf("%s Payload: %s\n", COD1PLUS_TAG, payload);
-
-                    if (http_post(g_cfg.api_url, payload) == 0)
-                        printf("%s Payload sent OK\n", COD1PLUS_TAG);
-                    else
-                        printf("%s Payload send FAILED\n", COD1PLUS_TAG);
-                }
-            }
+            static char payload[65536];
+            if (!process_log_line(line, payload, sizeof(payload))) continue;
+            printf("%s Sending payload (%zu bytes) to %s\n",
+                   COD1PLUS_TAG, strlen(payload), g_cfg.api_url);
+            printf("%s Payload: %s\n", COD1PLUS_TAG, payload);
+            if (http_post(g_cfg.api_url, payload) == 0)
+                printf("%s Payload sent OK\n", COD1PLUS_TAG);
+            else
+                printf("%s Payload send FAILED\n", COD1PLUS_TAG);
         }
         last_pos = ftell(f);
     }
@@ -1639,7 +1847,7 @@ static void *log_tailer_thread(void *arg) {
 /* Constructor / Destructor                                            */
 /* ------------------------------------------------------------------ */
 
-static void __attribute__((constructor)) init(void) {
+COD1PLUS_CTOR static void init(void) {
     printf("%s Loaded (version %s)\n", COD1PLUS_TAG, COD1PLUS_VERSION);
 
     /* cod1reloaded server-side: protocol -> 10, master repoint, version gate.
@@ -1740,7 +1948,7 @@ static void __attribute__((constructor)) init(void) {
     }
 }
 
-static void __attribute__((destructor)) fini(void) {
+COD1PLUS_DTOR static void fini(void) {
     hook_remove(&g_sv_directconnect_hook);
     printf("%s Unloaded\n", COD1PLUS_TAG);
 }
