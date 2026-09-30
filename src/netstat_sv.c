@@ -134,14 +134,19 @@ void netstat_frame(void) {
     }
 }
 
-/* Test clients: when a bot stands still its entity state can still carry a velocity (150 u/s
- * along the view, from the fake usercmd pmove against a wall or a stuck slide) and the client
- * draws every player at pos + velocity * dt (TR_LINEAR_STOP extrapolation): a bot with that
- * ghost velocity is DRAWN 7.5-15 u ahead of where the server tests it - "je vise, ca
- * traverse". A bot that really moves (PAM bot_think, scr_bots_freeze 0) must keep its
- * velocity, the extrapolation is right for him. So: zero ps.velocity (gclient + 0x20) and
- * es.pos.trDelta (ent + 0x24) only when the bot's origin did not change since the last
- * frame. Real players are never touched. */
+/* GHOST VELOCITY. A player whose origin is pinned by a script link still runs pmove on the
+ * keys he holds, so his state carries a velocity while he does not move:
+ *   - sd.gsc does `other linkTo(self)` for the whole plant / defuse (5 s / 10 s): a planter
+ *     holding a strafe key has 190 u/s of velocity and a fixed origin;
+ *   - PAM freezes its test clients the same way (their usercmd is "run forward": 150 u/s).
+ * Every other client draws a player at pos + velocity * dt (TR_LINEAR_STOP extrapolation,
+ * up to one snapshot = 50 ms): the pinned player is DRAWN 7.5-9.5 u away from where the
+ * server tests him - "je tire sur celui qui plante, ca traverse", on 1.5 and 1.6 alike.
+ * Rule, run after every game frame and before the snapshots go out: a client whose origin
+ * did not change since the last frame gets es.pos.trDelta = 0 (ent + 0x24, what the OTHER
+ * clients extrapolate with). His own physics are untouched (ps.velocity is only zeroed for
+ * test clients, who have no prediction to disturb); a player who really moves keeps his
+ * velocity, the extrapolation is right for him. */
 #define RVA_G_ENTITIES_NS 0x21d6c0
 #define GENTITY_SIZE_NS   0x31c
 #define GE_ORIGIN_NS      0x138
@@ -156,14 +161,14 @@ void netstat_bots_freeze(uintptr_t game_base) {
         int moved;
         if (*(const int*)(ge + 0x04) != 1 || *(const int*)(ge + 0x90) != i) continue;
         cl = *(char**)(ge + 0x15c);
-        if (!cl || !netstat_is_bot(i)) continue;
+        if (!cl) continue;
         o = (const float*)(ge + GE_ORIGIN_NS);
         moved = (o[0] - g_bot_last[i][0]) * (o[0] - g_bot_last[i][0]) +
                 (o[1] - g_bot_last[i][1]) * (o[1] - g_bot_last[i][1]) +
                 (o[2] - g_bot_last[i][2]) * (o[2] - g_bot_last[i][2]) > 0.01f;
         g_bot_last[i][0] = o[0]; g_bot_last[i][1] = o[1]; g_bot_last[i][2] = o[2];
         if (moved) continue;
-        memset(cl + 0x20, 0, 12);      /* ps.velocity */
-        memset(ge + 0x24, 0, 12);      /* es.pos.trDelta */
+        memset(ge + 0x24, 0, 12);                              /* es.pos.trDelta: everyone */
+        if (netstat_is_bot(i)) memset(cl + 0x20, 0, 12);       /* ps.velocity: test clients only */
     }
 }
