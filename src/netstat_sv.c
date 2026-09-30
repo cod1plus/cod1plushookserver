@@ -134,23 +134,35 @@ void netstat_frame(void) {
     }
 }
 
-/* Test clients never move, yet their entity state carries a velocity (150 u/s along the
- * view, from the fake usercmd pmove) and the client draws every player at
- * pos + velocity * dt (TR_LINEAR_STOP extrapolation): a bot with that ghost velocity is
- * DRAWN 7.5-15 u ahead of where the server tests it - "je vise, ca traverse". Zero it every
- * frame: ps.velocity (gclient + 0x20) and es.pos.trDelta (ent + 0x24), so the drawn bot
- * is the tested bot. Real players are not touched. */
+/* Test clients: when a bot stands still its entity state can still carry a velocity (150 u/s
+ * along the view, from the fake usercmd pmove against a wall or a stuck slide) and the client
+ * draws every player at pos + velocity * dt (TR_LINEAR_STOP extrapolation): a bot with that
+ * ghost velocity is DRAWN 7.5-15 u ahead of where the server tests it - "je vise, ca
+ * traverse". A bot that really moves (PAM bot_think, scr_bots_freeze 0) must keep its
+ * velocity, the extrapolation is right for him. So: zero ps.velocity (gclient + 0x20) and
+ * es.pos.trDelta (ent + 0x24) only when the bot's origin did not change since the last
+ * frame. Real players are never touched. */
 #define RVA_G_ENTITIES_NS 0x21d6c0
 #define GENTITY_SIZE_NS   0x31c
+#define GE_ORIGIN_NS      0x138
+static float g_bot_last[MAX_CL][3];
 void netstat_bots_freeze(uintptr_t game_base) {
     int i;
     if (!game_base) return;
     for (i = 0; i < MAX_CL; ++i) {
         char* ge = (char*)(game_base + RVA_G_ENTITIES_NS) + (size_t)i * GENTITY_SIZE_NS;
         char* cl;
+        const float* o;
+        int moved;
         if (*(const int*)(ge + 0x04) != 1 || *(const int*)(ge + 0x90) != i) continue;
         cl = *(char**)(ge + 0x15c);
         if (!cl || !netstat_is_bot(i)) continue;
+        o = (const float*)(ge + GE_ORIGIN_NS);
+        moved = (o[0] - g_bot_last[i][0]) * (o[0] - g_bot_last[i][0]) +
+                (o[1] - g_bot_last[i][1]) * (o[1] - g_bot_last[i][1]) +
+                (o[2] - g_bot_last[i][2]) * (o[2] - g_bot_last[i][2]) > 0.01f;
+        g_bot_last[i][0] = o[0]; g_bot_last[i][1] = o[1]; g_bot_last[i][2] = o[2];
+        if (moved) continue;
         memset(cl + 0x20, 0, 12);      /* ps.velocity */
         memset(ge + 0x24, 0, 12);      /* es.pos.trDelta */
     }
