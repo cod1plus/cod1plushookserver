@@ -38,6 +38,7 @@
 #include "anim_clamp.h"
 #include "competitive_sv.h"
 #include "cheat_gate.h"
+#include "pure_extra.h"
 
 #define COD1PLUS_TAG    "[cod1plus]"
 
@@ -1893,6 +1894,10 @@ COD1PLUS_CTOR static void init(void) {
 
     /* cvar cheat check (PB replacement part 2). Observe-only by default. */
     cheat_gate_init();
+
+    /* the HD texture pack: pure clients may hold it, the server does not have to
+     * (COD1RELOADED_PURE_EXTRA=0 disables it). */
+    pure_extra_init();
 
     const char *mode = getenv("COD1PLUS_MODE");
     int live_mode = (!mode || strcasecmp(mode, "live") == 0);

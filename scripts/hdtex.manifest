@@ -1,0 +1,14 @@
+# cod1plus HD texture pack manifest (tools/make_manifest.py format) - zcod7 (env/ skies as DXT) is left out:
+# the 1.1 engine flips cube map faces as RGBA and dies on them (Hunk_FreeTempMemory: bad magic)
+# zcod9_fix = the pack's 17 DX10-header textures re-headered as plain DXT5 (the engine only reads DXT1/3/5)
+mod main
+version 3
+file zcod1.pk3 1125051336 3e2653a3ebc2cb9d78180295e841e319dc4c9887ec6f09f59413de7994b7da6c http://87.106.7.52:8080/fastdl/cod1/hdtex/zcod1.pk3
+file zcod2.pk3 926320747 fc86cbfbcf78740bd032c7a2429d39b6f89fb8f3a94faad9e2caaaff19adb1f2 http://87.106.7.52:8080/fastdl/cod1/hdtex/zcod2.pk3
+file zcod3.pk3 1011784220 502b9d673883dc85a4649e96e050b8fe93636b59704d9a09764a0ba22242c4dc http://87.106.7.52:8080/fastdl/cod1/hdtex/zcod3.pk3
+file zcod4.pk3 925090850 4f988668f1eb087a405dfa7b8d84c2406bbf3d5a23cde0e5895b2138de48aeca http://87.106.7.52:8080/fastdl/cod1/hdtex/zcod4.pk3
+file zcod5.pk3 1109248528 d9084957e32fab8713586f350b4502a7268241ad9dd0498c86c594f3356ab5e5 http://87.106.7.52:8080/fastdl/cod1/hdtex/zcod5.pk3
+file zcod6.pk3 374142910 2f801ba1b308f2605bbb8be7ff04387c68e7bf448dbeab8f65c5d05c3a52949b http://87.106.7.52:8080/fastdl/cod1/hdtex/zcod6.pk3
+file zcod9_fix.pk3 131620082 0c537bd0ea2ba1ca4607d5a36aa90d48d2af673535009f3872f68925ed41ca5f http://87.106.7.52:8080/fastdl/cod1/hdtex/zcod9_fix.pk3
+remove zcod7.pk3
+cvar com_hunkMegs 512
