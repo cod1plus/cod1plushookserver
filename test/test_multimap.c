@@ -1,6 +1,6 @@
 /* test_multimap.c - host test of the match reporting across several maps (BO3 / BO5).
  *
- *   gcc -m32 -O1 -Isrc -o /tmp/test_multimap test/test_multimap.c -lpthread && /tmp/test_multimap
+ *   gcc -m32 -O1 -Isrc -o /tmp/test_multimap test/test_multimap.c src/match_stats.c src/hooks.c -lpthread && /tmp/test_multimap
  *
  * Includes src/cod1plus.c itself (COD1PLUS_TEST: no constructor) and feeds it game log
  * lines the way the tailer does, then checks the payloads it would POST.

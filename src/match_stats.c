@@ -44,7 +44,9 @@
  *
  * OUTPUT. cod1plus_stats.json in the server directory after every round (the same
  * player objects as the FPSChallenge payload / zPAM upload), and one console line per
- * round. Nothing else is written; nothing in the game is changed.
+ * round. The FPSChallenge payload (cod1plus.c) takes from here what PAM does not compute -
+ * entry kills / deaths, aces, clutches - through match_stats_extra(); everything else in it
+ * stays PAM's. Nothing in the game is changed.
  *
  * Env: COD1PLUS_STATS=0 off, COD1PLUS_STATS_VERBOSE=1 one line per kill / player,
  *      COD1PLUS_STATS_FILE=<path> another output file.
@@ -55,6 +57,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <pthread.h>
 
 #include "hooks.h"
 #include "match_stats.h"
@@ -163,6 +166,16 @@ static int r_entry_done;
 static int r_size[3];                       /* max alive seen this round, per team */
 static int r_clutch[3], r_clutch_enemies[3];
 static int r_snap_axis, r_snap_allies;
+
+/* last finished round, for the payload built on cod1plus.c's tailer thread */
+typedef struct {
+    char uuid[64], norm[64];
+    int  slot;
+    match_stats_extra_t x;
+} snap_t;
+static snap_t          g_snap[MAX_REC];
+static int             g_snap_n;
+static pthread_mutex_t g_snap_mx = PTHREAD_MUTEX_INITIALIZER;
 
 /* ------------------------------------------------------------------------------------- */
 /* engine reads                                                                          */
@@ -445,6 +458,51 @@ static void update_clutch(void)
 
 static void write_json(void);
 
+/* end of every round, game thread. Never cleared: a new map replaces it at its first round end,
+ * and PAM's last [STATS_EVENT] of a map may still be on its way to the tailer when the next map loads */
+static void snapshot(void)
+{
+    pthread_mutex_lock(&g_snap_mx);
+    g_snap_n = 0;
+    for (int r = 0; r < MAX_REC; r++) {
+        const rec_t *p = &g_rec[r];
+        if (!p->used || !p->played) continue;
+        snap_t *s = &g_snap[g_snap_n++];
+        memset(s, 0, sizeof(*s));
+        snprintf(s->uuid, sizeof(s->uuid), "%s", p->uuid);
+        snprintf(s->norm, sizeof(s->norm), "%s", p->norm);
+        s->slot = -1;
+        for (int j = 0; j < MAX_SLOTS; j++)
+            if (g_slot[j].rec == r && client_of(j)) { s->slot = j; break; }
+        s->x.entry_kills = p->entry_kills;
+        s->x.entry_deaths = p->entry_deaths;
+        s->x.aces = p->aces;
+        for (int c = 1; c <= CL_OUT; c++) { s->x.clutch_won[c] = p->clutch_won[c]; s->x.clutch_att[c] = p->clutch_att[c]; }
+    }
+    pthread_mutex_unlock(&g_snap_mx);
+}
+
+int match_stats_extra(const char *uuid, int slot, const char *name, match_stats_extra_t *out)
+{
+    char norm[64];
+    int found = -1;
+    memset(out, 0, sizeof(*out));
+    name_norm(name ? name : "", norm, sizeof(norm));
+    pthread_mutex_lock(&g_snap_mx);
+    if (uuid && uuid[0])
+        for (int i = 0; i < g_snap_n && found < 0; i++)
+            if (g_snap[i].uuid[0] && strcmp(g_snap[i].uuid, uuid) == 0) found = i;
+    if (found < 0 && slot >= 0)
+        for (int i = 0; i < g_snap_n && found < 0; i++)
+            if (g_snap[i].slot == slot) found = i;
+    if (found < 0 && norm[0])
+        for (int i = 0; i < g_snap_n && found < 0; i++)
+            if (strcmp(g_snap[i].norm, norm) == 0) found = i;
+    if (found >= 0) *out = g_snap[found].x;
+    pthread_mutex_unlock(&g_snap_mx);
+    return found >= 0;
+}
+
 static void round_end(int winner, const char *how)
 {
     if (!r_active) return;
@@ -474,6 +532,7 @@ static void round_end(int winner, const char *how)
         }
     }
     g_rounds++;
+    snapshot();
     write_json();
     printf("%s round %d over, winner %s (%s), %dv%d: clutch %s, ace %s -> %s\n", TAG, g_rounds,
            team_name(winner), how, r_size[TEAM_ALLIES], r_size[TEAM_AXIS],

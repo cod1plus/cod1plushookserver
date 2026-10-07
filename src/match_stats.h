@@ -17,6 +17,15 @@ int  match_stats_enabled(void);
 void match_stats_game_init(uintptr_t game_base, int restart, int savepersist);
 void match_stats_frame(void);
 
+/* The round-based stats PAM does not compute, for the FPSChallenge payload (cod1plus.c, tailer
+ * thread). Values as of the last finished round. Looked up by login uuid, else client slot, else
+ * name; returns 0 (and zeros) when the player has no row. clutch_*[1..5] = 1v1..1v5. */
+typedef struct {
+    int entry_kills, entry_deaths, aces;
+    int clutch_won[6], clutch_att[6];
+} match_stats_extra_t;
+int  match_stats_extra(const char *uuid, int slot, const char *name, match_stats_extra_t *out);
+
 /* cod1plus.c: identity and team the same way the FPSChallenge payload resolves them.
  * cod1plus_client_uuid: the login uuid the client in this slot sent ("" = none).
  * cod1plus_player_identity: uuid (login, else roster by name, else the name itself),

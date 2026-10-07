@@ -1543,6 +1543,10 @@ static int build_payload(const match_config_t *c,
         char damage_str[32];
         snprintf(damage_str, sizeof(damage_str), "%.1f", (float)ep->damage);
 
+        /* what PAM does not compute, from match_stats.c (zeros when the module has no row) */
+        match_stats_extra_t x;
+        match_stats_extra(uuid, ep->slot, ep->name, &x);
+
         int n = snprintf(out + pos, out_sz - pos,
             "%s{"
             "\"key\":\"%s\","
@@ -1558,13 +1562,25 @@ static int build_payload(const match_config_t *c,
             "\"deaths\":\"%d\","
             "\"grenades\":\"%d\","
             "\"plants\":\"%d\","
-            "\"defuses\":\"%d\""
+            "\"defuses\":\"%d\","
+            "\"entry_kills\":\"%d\","
+            "\"entry_deaths\":\"%d\","
+            "\"aces\":\"%d\","
+            "\"clutches_1v1\":\"%d\",\"clutches_1v1_attempts\":\"%d\","
+            "\"clutches_1v2\":\"%d\",\"clutches_1v2_attempts\":\"%d\","
+            "\"clutches_1v3\":\"%d\",\"clutches_1v3_attempts\":\"%d\","
+            "\"clutches_1v4\":\"%d\",\"clutches_1v4_attempts\":\"%d\","
+            "\"clutches_1v5\":\"%d\",\"clutches_1v5_attempts\":\"%d\""
             "}",
             emitted_players ? "," : "",
             key_uuid, esc_uuid, esc_name,
             team_label, esc_tname, score_str,
             ep->kills, ep->headshots, ep->assists, damage_str, ep->deaths,
-            ep->grenades, ep->plants, ep->defuses);
+            ep->grenades, ep->plants, ep->defuses,
+            x.entry_kills, x.entry_deaths, x.aces,
+            x.clutch_won[1], x.clutch_att[1], x.clutch_won[2], x.clutch_att[2],
+            x.clutch_won[3], x.clutch_att[3], x.clutch_won[4], x.clutch_att[4],
+            x.clutch_won[5], x.clutch_att[5]);
         pos += n;
         emitted_players++;
     }

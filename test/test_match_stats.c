@@ -182,6 +182,16 @@ int main(void)
     logline("Winners;axis;5;foxtrot\n");
     assert(!r_active && g_rounds == 2);
 
+    /* what the FPSChallenge payload reads (tailer thread): login, slot, then name */
+    {
+        match_stats_extra_t x;
+        assert(match_stats_extra("d21b16a8-9eeb-4215-9be5-5c63d3368deb", -1, "whatever", &x) &&
+               x.entry_kills == 1 && x.aces == 1 && x.clutch_won[4] == 1 && x.clutch_att[4] == 1);
+        assert(match_stats_extra("", 7, "", &x) && x.clutch_won[5] == 1 && x.clutch_att[5] == 1);
+        assert(match_stats_extra("", -1, "^2Golf", &x) && x.entry_deaths == 1);
+        assert(!match_stats_extra("nobody", -1, "nobody", &x) && x.aces == 0);
+    }
+
     /* ---- PAM's line for the same players: identical -> 0 mismatch lines ---- */
     {
         char line[512];
