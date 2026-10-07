@@ -24,6 +24,9 @@
  * other module here does - not dladdr. Turning _GNU_SOURCE on for every translation unit
  * would re-enable the glibc 2.38 __isoc23_* redirect through atoi() and friends, and the
  * build guard would (rightly) reject the module. See glibc_compat.h.
+ *
+ * The same wrapper gives match_stats.c its two entry points on the game thread: GAME_INIT
+ * (hooks installed before G_InitGame runs a single line of script) and GAME_RUN_FRAME.
  */
 
 #include <stdio.h>
@@ -33,6 +36,7 @@
 #include <dlfcn.h>
 
 #include "gear_force.h"
+#include "match_stats.h"
 
 #define TAG "[gear]"
 #define GAME_SO_NAME "game.mp.i386.so"
@@ -40,6 +44,7 @@
 #define GAME_INIT 2                  /* vmMain command -> G_InitGame. NOT 0 as in Quake 3: CoD1's
                                       * table (game .rodata 0x7aa24, 24 entries) has 0 = default,
                                       * 1 = api version (returns 5), 2 = G_InitGame @0x4d8e3. */
+#define GAME_RUN_FRAME 12            /* -> G_RunFrame @0x4d98c */
 
 #ifndef RTLD_NEXT
 #define RTLD_NEXT ((void*)-1L)       /* glibc's value; the header only exposes it with _GNU_SOURCE */
@@ -85,14 +90,20 @@ static void game_range(uintptr_t* lo, uintptr_t* hi)
 static int vmmain_wrapper(int cmd, int a0, int a1, int a2, int a3, int a4, int a5,
                           int a6, int a7, int a8, int a9, int a10, int a11)
 {
-    if (cmd == GAME_INIT && g_game_base && gear_force_enabled()) {
-        trap_cvar_set_t set = (trap_cvar_set_t)(g_game_base + RVA_TRAP_CVAR_SET);
-        set("g_useGear", "0");
-        printf("%s g_useGear forced to 0 before G_InitGame (no attached gear on player "
-               "models; COD1RELOADED_GEAR=1 to leave the cvar alone)\n", TAG);
-        fflush(stdout);
+    int r;
+    if (cmd == GAME_INIT && g_game_base) {
+        if (gear_force_enabled()) {
+            trap_cvar_set_t set = (trap_cvar_set_t)(g_game_base + RVA_TRAP_CVAR_SET);
+            set("g_useGear", "0");
+            printf("%s g_useGear forced to 0 before G_InitGame (no attached gear on player "
+                   "models; COD1RELOADED_GEAR=1 to leave the cvar alone)\n", TAG);
+            fflush(stdout);
+        }
+        match_stats_game_init(g_game_base, a2, a3);   /* G_InitGame(levelTime, seed, restart, savepersist) */
     }
-    return g_real_vmmain(cmd, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+    r = g_real_vmmain(cmd, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+    if (cmd == GAME_RUN_FRAME) match_stats_frame();
+    return r;
 }
 
 void* dlsym(void* handle, const char* name)
@@ -108,14 +119,14 @@ void* dlsym(void* handle, const char* name)
     }
     r = real_dlsym(handle, name);
 
-    if (r && name && strcmp(name, "vmMain") == 0 && gear_force_enabled()) {
+    if (r && name && strcmp(name, "vmMain") == 0 && (gear_force_enabled() || match_stats_enabled())) {
         uintptr_t lo, hi;
         game_range(&lo, &hi);
         if (lo && (uintptr_t)r >= lo && (uintptr_t)r < hi) {
             g_real_vmmain = (vmmain_t)r;
             g_game_base   = lo;
-            printf("%s vmMain of %s wrapped (base 0x%08lx): g_useGear will be 0 at every "
-                   "G_InitGame\n", TAG, GAME_SO_NAME, (unsigned long)lo);
+            printf("%s vmMain of %s wrapped (base 0x%08lx)%s\n", TAG, GAME_SO_NAME, (unsigned long)lo,
+                   gear_force_enabled() ? ": g_useGear will be 0 at every G_InitGame" : "");
             fflush(stdout);
             return (void*)vmmain_wrapper;
         }
