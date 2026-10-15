@@ -14,6 +14,7 @@
  * results are compared at the server's frame times.
  */
 #include "../src/shared/lean_controllers.c"
+#define SERVER_ENGINE_LATERAL 7.5f   /* the retuned .rodata constant of a live server (COD1RELOADED_LEAN_CONST) */
 
 #include <stdlib.h>
 
@@ -60,7 +61,7 @@ static void engine_pose(int t, float* out, int flicker)
     out[LC_BACK_MID + 2]  = roll * 0.5f;
     out[LC_BACK_UP + 2]   = roll * -0.6f;
     out[LC_TAG_ANG_ROLL]  = lf * LC_LEAN_ROLL_PER_FRAC;
-    out[LC_TAG_OFF_Y]     = -lf * LC_LATERAL_TOTAL;
+    out[LC_TAG_OFF_Y]     = -lf * SERVER_ENGINE_LATERAL;
     out[LC_BACK_LOW + 0]  = pitch * 0.2f;
     out[LC_BACK_MID + 0]  = pitch * 0.3f;
     out[LC_BACK_UP + 0]   = pitch * 0.5f;
@@ -75,7 +76,7 @@ static void pose(int cn, int t, int blend, float* out, int flicker)
     c.side = LC_SIDE_SERVER;
     c.client_num = cn;
     c.stance = LC_STANCE_STAND;
-    c.engine_lateral = LC_LATERAL_TOTAL;
+    c.engine_lateral = SERVER_ENGINE_LATERAL;
     c.es = g_es;
     c.blend = blend;
     c.game_time = t;
@@ -182,7 +183,7 @@ int main(void)
         {
             lc_ctx_t c;
             memset(&c, 0, sizeof(c));
-            c.client_num = 5; c.stance = LC_STANCE_STAND; c.engine_lateral = LC_LATERAL_TOTAL;
+            c.client_num = 5; c.stance = LC_STANCE_STAND; c.engine_lateral = SERVER_ENGINE_LATERAL;
             c.es = g_es; c.blend = LC_BLEND_PEEK; c.game_time = 950;
             lc_apply(tmp, &c);
         }
@@ -202,7 +203,7 @@ int main(void)
             o[LC_TAG_ANG_ROLL] = LC_LEAN_ROLL_PER_FRAC * 0.75f * sinf((float)t / 100.0f);
             memcpy(g_es + 0xcc, &v, 4);
             memset(&c, 0, sizeof(c));
-            c.client_num = 6; c.stance = LC_STANCE_STAND; c.engine_lateral = LC_LATERAL_TOTAL;
+            c.client_num = 6; c.stance = LC_STANCE_STAND; c.engine_lateral = SERVER_ENGINE_LATERAL;
             c.es = g_es; c.blend = LC_BLEND_COMMIT; c.game_time = t;
             lc_apply(o, &c);
             if (lc_bs[6].t_start != prev_start) ++restarts;
@@ -255,7 +256,7 @@ int main(void)
             cl[LC_BACK_UP + 1] = -0.2f * legs[t];
             memcpy(g_es + 0xcc, &v, 4);
             memset(&c, 0, sizeof(c));
-            c.client_num = 10; c.stance = LC_STANCE_STAND; c.engine_lateral = LC_LATERAL_TOTAL;
+            c.client_num = 10; c.stance = LC_STANCE_STAND; c.engine_lateral = SERVER_ENGINE_LATERAL;
             c.es = g_es; c.blend = LC_BLEND_COMMIT; c.game_time = t;
             lc_apply(cl, &c);
             if (t % 50 == 0) {
@@ -295,7 +296,7 @@ int main(void)
             engine_pose(t, cl, 0);
             memcpy(g_es + 0xcc, &v, 4);
             memset(&c, 0, sizeof(c));
-            c.client_num = 12; c.stance = LC_STANCE_STAND; c.engine_lateral = LC_LATERAL_TOTAL;
+            c.client_num = 12; c.stance = LC_STANCE_STAND; c.engine_lateral = SERVER_ENGINE_LATERAL;
             c.es = g_es; c.blend = LC_BLEND_COMMIT; c.game_time = t;
             lc_apply(cl, &c);
             if (t % 50 == 0) {
@@ -338,7 +339,7 @@ int main(void)
         /* v1 by hand: top-up then reprojection */
         {
             const float lf = b[LC_TAG_ANG_ROLL] / LC_LEAN_ROLL_PER_FRAC, toy = b[LC_TAG_ANG_YAW];
-            b[LC_TAG_OFF_Y] += -lf * (LC_LATERAL_TOTAL - 2.5f);
+            b[LC_TAG_OFF_Y] += -lf * (lc_lateral_total(LC_STANCE_STAND, lf) - 2.5f);
             lc_adjust_rotation((b[LC_BACK_LOW + 1] - toy) * LC_DIAG_K, &b[LC_BACK_LOW]);
             lc_adjust_rotation((b[LC_BACK_MID + 1] - toy) * LC_DIAG_K, &b[LC_BACK_MID]);
         }
