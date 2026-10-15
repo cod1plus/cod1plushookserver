@@ -28,6 +28,7 @@
 #include "hooks.h"
 #include "cod1reloaded.h"
 #include "lean_hitbox.h"
+#include "lean_probe.h"
 #include "perbone_hit.h"
 #include "pose_sync.h"
 #include "bullet_prio.h"
@@ -1862,6 +1863,7 @@ COD1PLUS_CTOR static void init(void) {
      * "clip"/corner-peek). Spawns a watcher that hooks game.mp.i386.so once it
      * is loaded and re-installs on map change. COD1RELOADED_LEAN_HITBOX=0 off. */
     lean_hitbox_init();
+    lean_probe_init();    /* diagnostic, COD1RELOADED_LEAN_PROBE=1 only */
 
     /* cod1reloaded: per-bone bullet hit refinement (fine phase on top of the
      * box shift). Off unless COD1RELOADED_PERBONE_HIT is set (dump | on). */

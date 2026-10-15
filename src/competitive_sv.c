@@ -48,6 +48,7 @@
 #include "pose_sync.h"
 #include "hitbox_send.h"
 #include "hitmap_diag.h"
+#include "lean_probe.h"
 #include "netstat_sv.h"
 
 #define TAG "[competitive]"
@@ -292,6 +293,7 @@ static void hook_G_RunFrame(int levelTime) {
     orig_runframe(levelTime);
     netstat_frame();                  /* COD1RELOADED_NETSTAT=N only: snapshot / rate report */
     hitmap_frame(g_base);             /* diagnostic, COD1RELOADED_HITMAP=1 only */
+    lean_probe_frame(g_base);         /* diagnostic, COD1RELOADED_LEAN_PROBE=1 only */
     pose_sync_frame(g_base);          /* the controller blend's per-frame pass: after the
                                        * frame, when every ClientEndFrame has run */
     hitbox_send_frame(g_base);        /* server cvar cod1x_drawhitbox: stream the tested boxes */

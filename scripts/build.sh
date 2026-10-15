@@ -28,6 +28,7 @@ ${CC} -m32 -shared -fPIC -O2 -Wall -Wextra ${CFLAGS_COMPAT} \
   "${ROOT_DIR}/src/perbone_hit.c" \
   "${ROOT_DIR}/src/pose_sync.c" \
   "${ROOT_DIR}/src/hitmap_diag.c" \
+  "${ROOT_DIR}/src/lean_probe.c" \
   "${ROOT_DIR}/src/netstat_sv.c" \
   "${ROOT_DIR}/src/bullet_prio.c" \
   "${ROOT_DIR}/src/hitbox_fix.c" \
