@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- use_pickup: walking over a weapon of a type you carry no longer takes its ammo (nor plays the pickup
+  sound to the players around); the use key takes it, as it already took or swapped a weapon of another
+  type. Grenades and pistols too (they are weapons). Server side, every client; a client with
+  `cg_predictItems 1` still predicts the pickup for itself. `COD1RELOADED_USE_PICKUP=0` restores the engine
+  behaviour.
+
 ## 1.6.6 (unreleased)
 
 - Ruleset (the cod2x way): the server publishes `sv_competitive_ruleset` from `ruleset.txt` (re-read live;

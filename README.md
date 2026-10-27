@@ -70,6 +70,7 @@ Everything is an environment variable on the launch line; the defaults are the p
 | `COD1RELOADED_GEAR` | unset | `1` leaves `g_useGear` to the server cfg |
 | `COD1RELOADED_POSE_SYNC` / `_SWING_SYNC` / `_ANIM_CLAMP` | on | `0` disables the fix (debug only) |
 | `COD1RELOADED_ANTILAG` | installed, inactive | `0` = do not install; `rcon g_antilag 1` activates it |
+| `COD1RELOADED_USE_PICKUP` | on | a weapon on the ground gives its ammo on the use key only; `0` = walking over a weapon you carry takes its ammo (engine) |
 | `COD1PLUS_MODE` | `live` | `dev` skips the FPSChallenge match fetch |
 | `COD1PLUS_STATS` / `_VERBOSE` / `_FILE` | on / `0` / `cod1plus_stats.json` | `0` disables the stats module; `1` logs every kill and the full table each round; output path |
 | `COD1MASTER_PORT` / `COD1MASTER_PUBLIC_IP` / `COD1MASTER_TIMEOUT` | `20510` / unset / `300` | master server |

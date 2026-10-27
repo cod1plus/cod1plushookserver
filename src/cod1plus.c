@@ -36,6 +36,7 @@
 #include "hitbox_draw.h"
 #include "antilag.h"
 #include "anim_clamp.h"
+#include "use_pickup.h"
 #include "competitive_sv.h"
 #include "cheat_gate.h"
 #include "pure_extra.h"
@@ -1931,6 +1932,10 @@ COD1PLUS_CTOR static void init(void) {
 
     /* stop "Player animation index out of range" drops: clamp instead of Com_Error */
     anim_clamp_init();
+
+    /* a weapon on the ground gives its ammo on the use key only, not by walking over it
+     * (COD1RELOADED_USE_PICKUP=0 keeps the engine's walk-over pickup) */
+    use_pickup_init();
 
     /* publish g_competitive as SYSTEMINFO so modded clients lock their fair-play
      * cvars (the cod2x model). Inert until the cfg sets g_competitive 1. */
