@@ -45,7 +45,9 @@ cl_timenudge -20 0
 # Players with visible loss should run 2.
 cl_packetdup 1 5
 pmove_fixed 0
-timescale 1
+# timescale: NOT listed (2026-10-05). CVAR_CHEAT (0xa00): the engine already holds it at 1 while
+# sv_cheats is 0, so the rule added nothing in game - but this spec is recorded in every demo
+# and clients up to 1.6.12 re-applied it during playback (timescale snapped back to 1).
 cl_avidemo 0
 
 # ---------------- input (no scripted turns) ----------------

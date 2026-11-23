@@ -47,6 +47,10 @@ libraries, including `libstdc++.so.5` (see `docker/Dockerfile` for a Debian reci
   + cheat gate (log or kick: cheat cvar names, or a client that fights the ruleset enforcement).
 - `g_useGear` forced to 0, 40-tick `snaps` cap (set `sv_fps 40` in the server cfg).
 - Antilag (experimental, `g_antilag` cvar).
+- Player stats computed by the module itself, zPAM rules (score, kills, assists, damage, deaths, grenades,
+  plants, defuses, headshots, entry kills / deaths, aces, clutches 1v1..1v5): `cod1plus_stats.json` after
+  every round. Nothing to change in the mod: damage / deaths come from the engine, rounds and bomb plants
+  from the lines PAM already logs (`RoundStart;`, `Winners;`, `Bomb;`).
 
 ## Configuration
 
@@ -67,6 +71,7 @@ Everything is an environment variable on the launch line; the defaults are the p
 | `COD1RELOADED_POSE_SYNC` / `_SWING_SYNC` / `_ANIM_CLAMP` | on | `0` disables the fix (debug only) |
 | `COD1RELOADED_ANTILAG` | installed, inactive | `0` = do not install; `rcon g_antilag 1` activates it |
 | `COD1PLUS_MODE` | `live` | `dev` skips the FPSChallenge match fetch |
+| `COD1PLUS_STATS` / `_VERBOSE` / `_FILE` | on / `0` / `cod1plus_stats.json` | `0` disables the stats module; `1` logs every kill and the full table each round; output path |
 | `COD1MASTER_PORT` / `COD1MASTER_PUBLIC_IP` / `COD1MASTER_TIMEOUT` | `20510` / unset / `300` | master server |
 
 ## Building from source

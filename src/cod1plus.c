@@ -39,6 +39,7 @@
 #include "competitive_sv.h"
 #include "cheat_gate.h"
 #include "pure_extra.h"
+#include "match_stats.h"
 
 #define COD1PLUS_TAG    "[cod1plus]"
 
@@ -1099,6 +1100,33 @@ static const char *lookup_team_label(const match_config_t *c,
     return (player_is_allies == team1_is_allies) ? "team1" : "team2";
 }
 
+/* ---- match_stats.c reads identities through these two: the same rules as the payload ---- */
+
+int cod1plus_client_uuid(int slot, char *out, size_t sz) {
+    if (!out || sz == 0) return 0;
+    out[0] = 0;
+    if (slot < 0 || slot >= MAX_CLIENTS || slot >= g_sv_maxclients) return 0;
+    char tmp[sizeof(g_client_uuid[0])];
+    memcpy(tmp, g_client_uuid[slot], sizeof(tmp));     /* the collector thread writes it */
+    tmp[sizeof(tmp) - 1] = 0;
+    snprintf(out, sz, "%s", tmp);
+    return out[0] != 0;
+}
+
+void cod1plus_player_identity(const char *login, const char *name, int side_allies,
+                              char *uuid, size_t usz, char *label, size_t lsz,
+                              char *team_name, size_t tsz) {
+    const match_config_t *c = &g_cfg;
+    const int team1_is_allies = g_side_tracker_initialized
+                              ? g_team1_is_allies_current
+                              : ((c->team1_side == 2) ? 0 : 1);
+    const char *u = (login && login[0]) ? login : lookup_uuid(c, name);
+    const char *l = lookup_team_label(c, u, name, side_allies ? "allies" : "axis", team1_is_allies);
+    snprintf(uuid, usz, "%s", u);
+    snprintf(label, lsz, "%s", l);
+    snprintf(team_name, tsz, "%s", strcmp(l, "team1") == 0 ? c->team1_name : c->team2_name);
+}
+
 /* Compute team1_score / team2_score from allies/axis scores + halftime. */
 static void resolve_scores(const match_config_t *c,
                             int allies_score, int axis_score, int team1_is_allies,
@@ -1515,6 +1543,10 @@ static int build_payload(const match_config_t *c,
         char damage_str[32];
         snprintf(damage_str, sizeof(damage_str), "%.1f", (float)ep->damage);
 
+        /* what PAM does not compute, from match_stats.c (zeros when the module has no row) */
+        match_stats_extra_t x;
+        match_stats_extra(uuid, ep->slot, ep->name, &x);
+
         int n = snprintf(out + pos, out_sz - pos,
             "%s{"
             "\"key\":\"%s\","
@@ -1530,13 +1562,25 @@ static int build_payload(const match_config_t *c,
             "\"deaths\":\"%d\","
             "\"grenades\":\"%d\","
             "\"plants\":\"%d\","
-            "\"defuses\":\"%d\""
+            "\"defuses\":\"%d\","
+            "\"entry_kills\":\"%d\","
+            "\"entry_deaths\":\"%d\","
+            "\"aces\":\"%d\","
+            "\"clutches_1v1\":\"%d\",\"clutches_1v1_attempts\":\"%d\","
+            "\"clutches_1v2\":\"%d\",\"clutches_1v2_attempts\":\"%d\","
+            "\"clutches_1v3\":\"%d\",\"clutches_1v3_attempts\":\"%d\","
+            "\"clutches_1v4\":\"%d\",\"clutches_1v4_attempts\":\"%d\","
+            "\"clutches_1v5\":\"%d\",\"clutches_1v5_attempts\":\"%d\""
             "}",
             emitted_players ? "," : "",
             key_uuid, esc_uuid, esc_name,
             team_label, esc_tname, score_str,
             ep->kills, ep->headshots, ep->assists, damage_str, ep->deaths,
-            ep->grenades, ep->plants, ep->defuses);
+            ep->grenades, ep->plants, ep->defuses,
+            x.entry_kills, x.entry_deaths, x.aces,
+            x.clutch_won[1], x.clutch_att[1], x.clutch_won[2], x.clutch_att[2],
+            x.clutch_won[3], x.clutch_att[3], x.clutch_won[4], x.clutch_att[4],
+            x.clutch_won[5], x.clutch_att[5]);
         pos += n;
         emitted_players++;
     }
