@@ -8,7 +8,8 @@
  * Once a second, on the game thread, the players on a team VOTE: a roster player of team 1 on
  * allies and a roster player of team 2 on axis both say "team 1 plays allies". A player is known
  * by the login his 1.6X client proves, else by his name in the roster; one not in the roster
- * does not vote. The majority wins; a tie or nobody known keeps the side tracker of the payload
+ * does not vote. The majority wins; a tie or nobody known keeps the last decisive vote (a round's
+ * map_restart empties the teams for a second), before any vote the side tracker of the payload
  * (configured starting side, half-times, the last round event). So the names follow the real
  * sides from the warm-up on, through every half-time, on maps 2 and 3 of a BO3 where the teams
  * choose again - the same rule the payload's scores already rely on.
@@ -54,6 +55,7 @@ static int       g_next_ms;            /* level time of the next vote */
 static int       g_published;          /* the cvars hold a match */
 static char      g_pub[5][136];        /* last values set: allies, axis, tag allies, tag axis, side */
 static int       g_last_side = -1;     /* 1 = team 1 on allies, for the log */
+static int       g_last_vote = -1;     /* the last decisive vote (kept through map restarts) */
 
 static int enabled(void)
 {
@@ -128,7 +130,17 @@ void match_teams_frame(void)
         if (!rt) continue;
         if ((rt == 1) == (side == TEAM_ALLIES)) allies++; else axis++;
     }
-    team1_allies = allies > axis ? 1 : axis > allies ? 0 : cod1plus_match_team1_allies();
+    /* a decisive vote wins; else the last one (every round's map_restart leaves the teams
+     * empty for about a second: falling back to the tracker there made the names flicker);
+     * the side tracker only before the first vote */
+    if (allies != axis) {
+        team1_allies = allies > axis;
+        g_last_vote = team1_allies;
+    } else if (g_last_vote >= 0) {
+        team1_allies = g_last_vote;
+    } else {
+        team1_allies = cod1plus_match_team1_allies();
+    }
 
     {
         char a[136], x[136], ta[40], tx[40];
