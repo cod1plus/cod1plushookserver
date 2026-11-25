@@ -37,6 +37,7 @@
 
 #include "gear_force.h"
 #include "match_stats.h"
+#include "match_teams.h"
 
 #define TAG "[gear]"
 #define GAME_SO_NAME "game.mp.i386.so"
@@ -100,9 +101,13 @@ static int vmmain_wrapper(int cmd, int a0, int a1, int a2, int a3, int a4, int a
             fflush(stdout);
         }
         match_stats_game_init(g_game_base, a2, a3);   /* G_InitGame(levelTime, seed, restart, savepersist) */
+        match_teams_game_init(g_game_base);           /* the FPSChallenge teams on each side, for the PAM */
     }
     r = g_real_vmmain(cmd, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
-    if (cmd == GAME_RUN_FRAME) match_stats_frame();
+    if (cmd == GAME_RUN_FRAME) {
+        match_stats_frame();
+        match_teams_frame();
+    }
     return r;
 }
 

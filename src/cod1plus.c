@@ -40,6 +40,7 @@
 #include "cheat_gate.h"
 #include "pure_extra.h"
 #include "match_stats.h"
+#include "match_teams.h"
 
 #define COD1PLUS_TAG    "[cod1plus]"
 
@@ -1125,6 +1126,32 @@ void cod1plus_player_identity(const char *login, const char *name, int side_alli
     snprintf(uuid, usz, "%s", u);
     snprintf(label, lsz, "%s", l);
     snprintf(team_name, tsz, "%s", strcmp(l, "team1") == 0 ? c->team1_name : c->team2_name);
+}
+
+/* ---- match_teams.c reads the match through these three (same identity rules as above) ---- */
+
+int cod1plus_match_team(int t, char *name, size_t nsz, char *tag, size_t tsz) {
+    const match_config_t *c = &g_cfg;
+    if (!c->loaded || (t != 1 && t != 2)) return 0;
+    snprintf(name, nsz, "%s", t == 1 ? c->team1_name : c->team2_name);
+    snprintf(tag, tsz, "%s", t == 1 ? c->team1_tag : c->team2_tag);
+    return name[0] != 0;
+}
+
+int cod1plus_match_team1_allies(void) {
+    return g_side_tracker_initialized ? g_team1_is_allies_current : (g_cfg.team1_side == 2 ? 0 : 1);
+}
+
+int cod1plus_roster_team(const char *login, const char *name) {
+    const match_config_t *c = &g_cfg;
+    if (!c->loaded) return 0;
+    if (login && login[0] && (!name || strcmp(login, name) != 0))
+        for (int i = 0; i < c->num_players; i++)
+            if (c->players[i].uuid[0] && strcmp(c->players[i].uuid, login) == 0)
+                return c->players[i].team == 1 ? 1 : 2;
+    const int idx = find_config_player(c, name);
+    if (idx >= 0) return c->players[idx].team == 1 ? 1 : 2;
+    return 0;
 }
 
 /* Compute team1_score / team2_score from allies/axis scores + halftime. */
