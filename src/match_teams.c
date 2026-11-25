@@ -153,9 +153,10 @@ void match_teams_frame(void)
         set_if_changed(2, "cod1x_tag_allies", ta);
         set_if_changed(3, "cod1x_tag_axis", tx);
         set_if_changed(4, "cod1x_team1_side", team1_allies ? "allies" : "axis");
-        if (!g_published || team1_allies != g_last_side) {
+        if (team1_allies != g_last_side) {                       /* a change, not every round */
             printf("%s %s plays allies, %s plays axis (%s: %d vote(s) allies, %d axis)\n", TAG, a, x,
-                   allies != axis ? "players" : "side tracker", allies, axis);
+                   allies != axis ? "players" : g_last_vote >= 0 ? "last vote" : "side tracker",
+                   allies, axis);
             fflush(stdout);
         }
     }
